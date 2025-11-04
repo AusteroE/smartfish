@@ -30,206 +30,95 @@ export default function Home() {
       };
       setMessage({ type: 'error', text: errorMessages[error || ''] || 'An error occurred' });
     }
+
+    // Auto-open sign-in modal if redirected from admin route
+    if (params.get('signin') === 'true') {
+      setSignInOpen(true);
+      // Keep redirect parameter in URL for sign-in modal to use
+      // Don't remove it yet - the sign-in modal needs it
+    }
   }, []);
 
   return (
-    <div className="container">
-      {message && (
-        <div
-          className={`message ${message.type === 'success' ? 'success' : 'error'}`}
-          style={{
-            position: 'fixed',
-            top: '20px',
-            right: '20px',
-            padding: '15px 20px',
-            borderRadius: '8px',
-            zIndex: 10000,
-            backgroundColor: message.type === 'success' ? '#d4edda' : '#f8d7da',
-            color: message.type === 'success' ? '#155724' : '#721c24',
-            border: `1px solid ${message.type === 'success' ? '#c3e6cb' : '#f5c6cb'}`,
-          }}
-        >
-          {message.text}
-          <button
-            onClick={() => setMessage(null)}
-            style={{ marginLeft: '10px', background: 'none', border: 'none', cursor: 'pointer' }}
-          >
-            ×
-          </button>
-        </div>
-      )}
-
-      <div className="hero">
-        <div className="hero-header">
-          <Image
-            src="/smartfishcarelogo.png"
-            alt="Smart Fish Care Logo"
-            className="logo"
-            width={100}
-            height={100}
-            priority
-          />
-        </div>
-
-        <h1>
-          Get Smart Care <br />
-          <span>For Fish</span>
-        </h1>
-        <p>
-          <span className="typewriter-text">
-            Your ultimate companion for thriving happy fish. Stay on top of water quality, feeding
-            schedules, and more because your fish deserve the absolute best care.
-          </span>
-        </p>
-
-        <div className="buttons">
-          <button
-            id="signInBtn"
-            onClick={() => setSignInOpen(true)}
-            style={{ '--content': "'Sign In'" } as React.CSSProperties}
-          >
-            <div className="left"></div>
-            <span className="hidden-text">Sign In</span>
-            <div className="right"></div>
-          </button>
-
-          <button
-            id="signUpBtn"
-            onClick={() => setSignUpOpen(true)}
-            style={{ '--content': "'Sign Up'" } as React.CSSProperties}
-          >
-            <div className="left"></div>
-            <span className="hidden-text">Sign Up</span>
-            <div className="right"></div>
-          </button>
-        </div>
-      </div>
-
-      <SignInModal isOpen={signInOpen} onClose={() => setSignInOpen(false)} router={router} />
-      <SignUpModal
-        isOpen={signUpOpen}
-        onClose={() => setSignUpOpen(false)}
-        onShowTerms={() => setTermsOpen(true)}
-        router={router}
-      />
-      <TermsModal isOpen={termsOpen} onClose={() => setTermsOpen(false)} />
-
+    <>
       <style jsx global>{`
         @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css');
-        
-        .container {
-          min-height: 100vh;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: radial-gradient(1200px 600px at 20% -10%, rgba(124, 92, 255, 0.18), transparent),
-                     radial-gradient(900px 500px at 100% 10%, rgba(76, 201, 240, 0.15), transparent),
-                     #0b1020;
-          color: #e6e9ef;
-          font-family: 'Inter', system-ui, -apple-system, sans-serif;
-          padding: 20px;
-        }
-
-        .hero {
-          text-align: center;
-          max-width: 800px;
-          width: 100%;
-        }
-
-        .hero-header {
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          margin-bottom: 40px;
-        }
-
-        .logo {
-          height: auto;
-          width: auto;
-          max-width: 150px;
-        }
-
-        h1 {
-          font-size: 3.5rem;
-          font-weight: 700;
-          margin-bottom: 20px;
-          line-height: 1.2;
-        }
-
-        h1 span {
-          background: linear-gradient(135deg, #7c5cff, #4cc9f0);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-          background-clip: text;
-        }
-
-        .typewriter-text {
-          font-size: 1.2rem;
-          color: #a2a8b6;
-          line-height: 1.6;
-          display: inline-block;
-        }
-
-        .buttons {
-          display: flex;
-          gap: 20px;
-          justify-content: center;
-          margin-top: 40px;
-          flex-wrap: wrap;
-        }
-
-        button {
-          position: relative;
-          padding: 15px 40px;
-          font-size: 1rem;
-          font-weight: 600;
-          color: white;
-          background: linear-gradient(135deg, #7c5cff, #4cc9f0);
-          border: none;
-          border-radius: 50px;
-          cursor: pointer;
-          overflow: hidden;
-          transition: all 0.3s ease;
-          text-transform: uppercase;
-          letter-spacing: 1px;
-        }
-
-        button:hover {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 25px rgba(124, 92, 255, 0.4);
-        }
-
-        button .left,
-        button .right {
-          position: absolute;
-          top: 0;
-          width: 50%;
-          height: 100%;
-          background: rgba(255, 255, 255, 0.1);
-          transition: transform 0.3s ease;
-        }
-
-        button .left {
-          left: -100%;
-        }
-
-        button .right {
-          right: -100%;
-        }
-
-        button:hover .left {
-          left: 0;
-        }
-
-        button:hover .right {
-          right: 0;
-        }
-
-        .hidden-text {
-          position: relative;
-          z-index: 1;
-        }
       `}</style>
-    </div>
+      <div className="min-h-screen flex items-center justify-center bg-[radial-gradient(1200px_600px_at_20%_-10%,rgba(124,92,255,0.18),transparent),radial-gradient(900px_500px_at_100%_10%,rgba(76,201,240,0.15),transparent),#0b1020] p-4 sm:p-5 font-['Inter',system-ui,-apple-system,sans-serif] text-[#e6e9ef]">
+        {message && (
+          <div
+            className={`fixed top-5 right-5 z-[10000] rounded-lg border px-5 py-4 ${message.type === 'success'
+                ? 'border-[#c3e6cb] bg-[#d4edda] text-[#155724]'
+                : 'border-[#f5c6cb] bg-[#f8d7da] text-[#721c24]'
+              }`}
+          >
+            {message.text}
+            <button
+              onClick={() => setMessage(null)}
+              className="ml-2.5 cursor-pointer border-none bg-transparent"
+            >
+              ×
+            </button>
+          </div>
+        )}
+
+        <div className="w-full max-w-[800px] text-center">
+          <div className="mb-6 sm:mb-10 flex justify-center">
+            <Image
+              src="/smartfishcarelogo.png"
+              alt="Smart Fish Care Logo"
+              className="h-auto w-auto max-w-[120px] sm:max-w-[150px]"
+              width={100}
+              height={100}
+              priority
+            />
+          </div>
+
+          <h1 className="mb-4 sm:mb-5 text-3xl sm:text-4xl md:text-[3.5rem] font-bold leading-tight px-4">
+            Get Smart Care <br />
+            <span className="bg-gradient-to-r from-[#7c5cff] to-[#4cc9f0] bg-clip-text text-transparent">
+              For Fish
+            </span>
+          </h1>
+          <p className="px-4">
+            <span className="inline-block text-base sm:text-lg md:text-xl leading-relaxed text-[#a2a8b6]">
+              Your ultimate companion for thriving happy fish. Stay on top of water quality, feeding
+              schedules, and more because your fish deserve the absolute best care.
+            </span>
+          </p>
+
+          <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row flex-wrap justify-center gap-4 sm:gap-5 px-4">
+            <button
+              id="signInBtn"
+              onClick={() => setSignInOpen(true)}
+              className="group relative overflow-hidden rounded-[50px] border-none bg-gradient-to-r from-[#7c5cff] to-[#4cc9f0] px-8 sm:px-10 py-3 sm:py-4 text-sm sm:text-base font-semibold uppercase tracking-wide text-white transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_25px_rgba(124,92,255,0.4)] w-full sm:w-auto"
+            >
+              <div className="absolute left-0 top-0 h-full w-1/2 -translate-x-full bg-white/10 transition-transform duration-300 group-hover:translate-x-0"></div>
+              <span className="relative z-10">Sign In</span>
+              <div className="absolute right-0 top-0 h-full w-1/2 translate-x-full bg-white/10 transition-transform duration-300 group-hover:translate-x-0"></div>
+            </button>
+
+            <button
+              id="signUpBtn"
+              onClick={() => setSignUpOpen(true)}
+              className="group relative overflow-hidden rounded-[50px] border-none bg-gradient-to-r from-[#7c5cff] to-[#4cc9f0] px-8 sm:px-10 py-3 sm:py-4 text-sm sm:text-base font-semibold uppercase tracking-wide text-white transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_25px_rgba(124,92,255,0.4)] w-full sm:w-auto"
+            >
+              <div className="absolute left-0 top-0 h-full w-1/2 -translate-x-full bg-white/10 transition-transform duration-300 group-hover:translate-x-0"></div>
+              <span className="relative z-10">Sign Up</span>
+              <div className="absolute right-0 top-0 h-full w-1/2 translate-x-full bg-white/10 transition-transform duration-300 group-hover:translate-x-0"></div>
+            </button>
+          </div>
+        </div>
+
+        <SignInModal isOpen={signInOpen} onClose={() => setSignInOpen(false)} router={router} />
+        <SignUpModal
+          isOpen={signUpOpen}
+          onClose={() => setSignUpOpen(false)}
+          onShowTerms={() => setTermsOpen(true)}
+          router={router}
+        />
+        <TermsModal isOpen={termsOpen} onClose={() => setTermsOpen(false)} />
+      </div>
+    </>
   );
 }

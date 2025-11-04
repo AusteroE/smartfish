@@ -25,7 +25,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     useEffect(() => {
         let mounted = true;
 
-        fetch('/api/user/me')
+        fetch('/api/user/me', {
+            credentials: 'include',
+        })
             .then((res) => res.json())
             .then((data) => {
                 if (!mounted) return;

@@ -6,7 +6,7 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -19,10 +19,11 @@ model User {
   role                UserRole  @default(user)
   emailVerified       Boolean   @default(false) @map("email_verified")
   verificationToken   String?   @map("verification_token") @db.VarChar(255)
-  verificationExpires DateTime? @map("verification_expires") @db.Timestamp
+  verificationExpires DateTime? @map("verification_expires")
   otpCode             String?   @map("otp_code") @db.VarChar(6)
-  otpExpires          DateTime? @map("otp_expires") @db.Timestamp
-  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamp
+  otpExpires          DateTime? @map("otp_expires")
+  lastSeen            DateTime? @map("last_seen")
+  createdAt           DateTime  @default(now()) @map("created_at")
 
   // Relations
   stockingRecords     StockingRecord[]
@@ -46,7 +47,7 @@ model SensorData {
   id          Int       @id @default(autoincrement())
   ph          Decimal?  @db.Decimal(5, 2)
   temperature Decimal?  @db.Decimal(5, 2)
-  timestamp   DateTime  @default(now()) @db.Timestamp
+  timestamp   DateTime  @default(now())
 
   @@map("sensor_data")
 }
@@ -58,8 +59,8 @@ model FishSizeRange {
   maxLength Decimal  @map("max_length") @db.Decimal(5, 2)
   minWidth  Decimal  @map("min_width") @db.Decimal(5, 2)
   maxWidth  Decimal  @map("max_width") @db.Decimal(5, 2)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamp
-  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamp
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   @@map("fish_size_ranges")
 }
@@ -72,8 +73,8 @@ model WaterParameter {
   dangerMin   Decimal? @map("danger_min") @db.Decimal(5, 2)
   dangerMax   Decimal? @map("danger_max") @db.Decimal(5, 2)
   unit        String   @db.VarChar(20)
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamp
-  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamp
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
 
   @@map("water_parameters")
 }
@@ -82,12 +83,12 @@ model StockingRecord {
   id             Int       @id @default(autoincrement())
   userId         Int       @map("user_id")
   fishType       String    @map("fish_type") @db.VarChar(100)
-  stockDate      DateTime  @map("stock_date") @db.Date
+  stockDate      DateTime  @map("stock_date")
   aquariumNumber String    @map("aquarium_number") @db.VarChar(50)
   quantity       Int?
   notes          String?   @db.Text
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamp
-  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamp
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -103,12 +104,12 @@ model HarvestRecord {
   fishType       String    @map("fish_type") @db.VarChar(100)
   quantity       Int
   size           String    @db.VarChar(50)
-  harvestDate    DateTime  @map("harvest_date") @db.Date
+  harvestDate    DateTime  @map("harvest_date")
   aquariumNumber String    @map("aquarium_number") @db.VarChar(50)
   weight         Decimal?  @db.Decimal(8, 2)
   notes          String?   @db.Text
-  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamp
-  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamp
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -126,8 +127,8 @@ model FeedingRecord {
   feedingTime String    @map("feeding_time") @db.VarChar(8)
   quantity    String?   @db.VarChar(50)
   notes       String?   @db.Text
-  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamp
-  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamp
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -144,8 +145,8 @@ model FishDetection {
   detectedWidth     Decimal   @map("detected_width") @db.Decimal(5, 2)
   sizeCategory      String    @map("size_category") @db.VarChar(50)
   confidenceScore    Decimal?  @map("confidence_score") @db.Decimal(3, 2)
-  detectionTimestamp DateTime @default(now()) @map("detection_timestamp") @db.Timestamp
-  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamp
+  detectionTimestamp DateTime @default(now()) @map("detection_timestamp")
+  createdAt         DateTime  @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -163,9 +164,9 @@ model EmailVerificationLog {
   verificationType VerificationType @map("verification_type")
   token           String    @db.VarChar(255)
   otpCode         String?   @map("otp_code") @db.VarChar(6)
-  expiresAt       DateTime  @map("expires_at") @db.Timestamp
+  expiresAt       DateTime  @map("expires_at")
   used            Boolean   @default(false)
-  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamp
+  createdAt       DateTime  @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -194,7 +195,7 @@ model SystemLog {
   newValues Json?
   ipAddress String?   @map("ip_address") @db.VarChar(45)
   userAgent String?   @map("user_agent") @db.Text
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamp
+  createdAt DateTime  @default(now()) @map("created_at")
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 

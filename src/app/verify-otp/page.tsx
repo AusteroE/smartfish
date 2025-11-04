@@ -29,6 +29,7 @@ function VerifyOTPContent() {
       const response = await fetch('/api/auth/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email, otp }),
       });
 
@@ -47,14 +48,14 @@ function VerifyOTPContent() {
   };
 
   return (
-    <div className="otp-container">
-      <div className="otp-box">
-        <div className="otp-icon">🔐</div>
-        <h2>OTP Verification</h2>
-        <p>Please enter the 6-digit code sent to your email address.</p>
+    <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(1200px_600px_at_20%_-10%,rgba(124,92,255,0.18),transparent),radial-gradient(900px_500px_at_100%_10%,rgba(76,201,240,0.15),transparent),#0b1020] p-5 font-['Inter',system-ui,-apple-system,sans-serif] text-[#e6e9ef]">
+      <div className="w-[90%] max-w-[500px] rounded-2xl border border-white/12 bg-gradient-to-b from-white/5 to-white/2 p-10 text-center shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-md">
+        <div className="mb-5 text-[64px] drop-shadow-[0_0_10px_rgba(124,92,255,0.3)]">🔐</div>
+        <h2 className="mb-2.5 font-bold text-[#e6e9ef]">OTP Verification</h2>
+        <p className="mb-8 text-[#a2a8b6]">Please enter the 6-digit code sent to your email address.</p>
 
         {error && (
-          <div className="message error">
+          <div className="my-5 rounded-xl border border-red-300/30 bg-gradient-to-r from-red-500/10 to-red-500/5 px-5 py-4 font-medium text-red-500 shadow-[0_4px_15px_rgba(239,68,68,0.1)]">
             {error}
           </div>
         )}
@@ -64,7 +65,7 @@ function VerifyOTPContent() {
           <input
             type="text"
             name="otp"
-            className="otp-input"
+            className="mb-5 w-full rounded-[15px] border border-white/12 bg-white/4 px-5 py-5 text-center text-2xl font-semibold tracking-[8px] text-[#e6e9ef] outline-none transition-all focus:border-[#7c5cff] focus:bg-white/6 focus:shadow-[0_0_0_3px_rgba(124,92,255,0.45)]"
             placeholder="000000"
             maxLength={6}
             pattern="[0-9]{6}"
@@ -77,122 +78,19 @@ function VerifyOTPContent() {
             autoFocus
           />
           <br />
-          <button type="submit" className="btn" disabled={loading}>
+          <button
+            type="submit"
+            className="inline-block rounded-[15px] border-none bg-gradient-to-r from-[#7c5cff] to-[#4cc9f0] px-9 py-4 text-base font-semibold text-white shadow-[0_4px_15px_rgba(124,92,255,0.3)] transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_25px_rgba(124,92,255,0.4)] disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={loading}
+          >
             {loading ? 'Verifying...' : 'Verify OTP'}
           </button>
         </form>
 
-        <p style={{ marginTop: '30px', color: '#666' }}>
+        <p className="mt-8 text-gray-600">
           <small>Didn&apos;t receive the code? Check your spam folder</small>
         </p>
       </div>
-
-      <style jsx>{`
-        .otp-container {
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          min-height: 100vh;
-          background: radial-gradient(1200px 600px at 20% -10%, rgba(124, 92, 255, 0.18), transparent),
-                     radial-gradient(900px 500px at 100% 10%, rgba(76, 201, 240, 0.15), transparent),
-                     #0b1020;
-          color: #e6e9ef;
-          font-family: 'Inter', system-ui, -apple-system, sans-serif;
-          padding: 20px;
-        }
-
-        .otp-box {
-          background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
-          backdrop-filter: blur(8px);
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          padding: 40px;
-          border-radius: 20px;
-          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
-          text-align: center;
-          max-width: 500px;
-          width: 90%;
-          color: #e6e9ef;
-        }
-
-        .otp-icon {
-          font-size: 64px;
-          margin-bottom: 20px;
-          filter: drop-shadow(0 0 10px rgba(124, 92, 255, 0.3));
-        }
-
-        .otp-input {
-          width: 100%;
-          padding: 20px;
-          font-size: 24px;
-          text-align: center;
-          letter-spacing: 8px;
-          background: rgba(255, 255, 255, 0.04);
-          border: 1px solid rgba(255, 255, 255, 0.12);
-          border-radius: 15px;
-          margin: 20px 0;
-          outline: none;
-          transition: all 0.3s ease;
-          color: #e6e9ef;
-          font-weight: 600;
-          box-sizing: border-box;
-        }
-
-        .otp-input:focus {
-          border-color: #7c5cff;
-          box-shadow: 0 0 0 3px rgba(124, 92, 255, 0.45);
-          background: rgba(255, 255, 255, 0.06);
-        }
-
-        .btn {
-          display: inline-block;
-          padding: 15px 35px;
-          background: linear-gradient(135deg, #7c5cff, #4cc9f0);
-          color: white;
-          text-decoration: none;
-          border-radius: 15px;
-          border: none;
-          cursor: pointer;
-          transition: all 0.3s ease;
-          font-size: 16px;
-          font-weight: 600;
-          box-shadow: 0 4px 15px rgba(124, 92, 255, 0.3);
-        }
-
-        .btn:hover:not(:disabled) {
-          transform: translateY(-2px);
-          box-shadow: 0 8px 25px rgba(124, 92, 255, 0.4);
-        }
-
-        .btn:disabled {
-          opacity: 0.6;
-          cursor: not-allowed;
-        }
-
-        .message {
-          padding: 15px 20px;
-          border-radius: 12px;
-          margin: 20px 0;
-          font-weight: 500;
-        }
-
-        .error {
-          background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(239, 68, 68, 0.05));
-          color: #ef4444;
-          border: 1px solid rgba(239, 68, 68, 0.3);
-          box-shadow: 0 4px 15px rgba(239, 68, 68, 0.1);
-        }
-
-        h2 {
-          color: #e6e9ef;
-          margin-bottom: 10px;
-          font-weight: 700;
-        }
-
-        p {
-          color: #a2a8b6;
-          margin-bottom: 30px;
-        }
-      `}</style>
     </div>
   );
 }
@@ -200,10 +98,10 @@ function VerifyOTPContent() {
 export default function VerifyOTPPage() {
   return (
     <Suspense fallback={
-      <div className="otp-container">
-        <div className="otp-box">
-          <div className="otp-icon">🔐</div>
-          <h2>Loading...</h2>
+      <div className="flex min-h-screen items-center justify-center bg-[radial-gradient(1200px_600px_at_20%_-10%,rgba(124,92,255,0.18),transparent),radial-gradient(900px_500px_at_100%_10%,rgba(76,201,240,0.15),transparent),#0b1020] p-5 font-['Inter',system-ui,-apple-system,sans-serif] text-[#e6e9ef]">
+        <div className="w-[90%] max-w-[500px] rounded-2xl border border-white/12 bg-gradient-to-b from-white/5 to-white/2 p-10 text-center shadow-[0_10px_30px_rgba(0,0,0,0.35)] backdrop-blur-md">
+          <div className="mb-5 text-[64px] drop-shadow-[0_0_10px_rgba(124,92,255,0.3)]">🔐</div>
+          <h2 className="mb-2.5 font-bold text-[#e6e9ef]">Loading...</h2>
         </div>
       </div>
     }>
@@ -211,4 +109,3 @@ export default function VerifyOTPPage() {
     </Suspense>
   );
 }
-

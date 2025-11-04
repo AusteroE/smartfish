@@ -1,40 +1,55 @@
 import nodemailer from 'nodemailer';
 
+// Gmail SMTP Configuration
 const emailConfig = {
-    host: process.env.SMTP_HOST || 'smtp.gmail.com',
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: false, // true for 465, false for other ports
-    auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASSWORD,
-    },
+  host: process.env.SMTP_HOST || 'smtp.gmail.com',
+  port: parseInt(process.env.SMTP_PORT || '587'),
+  secure: false, // true for 465, false for other ports (587 uses STARTTLS)
+  auth: {
+    user: process.env.SMTP_USER || process.env.FROM_EMAIL,
+    pass: process.env.SMTP_PASSWORD,
+  },
+  tls: {
+    // Do not fail on invalid certs
+    rejectUnauthorized: false,
+  },
 };
 
+// Create transporter with better error handling
 const transporter = nodemailer.createTransport(emailConfig);
 
+// Verify transporter configuration
+transporter.verify((error, success) => {
+  if (error) {
+    console.error('Email transporter verification failed:', error);
+  } else {
+    console.log('Email server is ready to send messages');
+  }
+});
+
 export function generateVerificationToken(): string {
-    return Math.random().toString(36).substring(2, 15) +
-        Math.random().toString(36).substring(2, 15);
+  return Math.random().toString(36).substring(2, 15) +
+    Math.random().toString(36).substring(2, 15);
 }
 
 export function generateOTP(): string {
-    return Math.floor(100000 + Math.random() * 900000).toString();
+  return Math.floor(100000 + Math.random() * 900000).toString();
 }
 
 export async function sendVerificationEmail(
-    email: string,
-    username: string,
-    token: string,
-    otp: string
+  email: string,
+  username: string,
+  token: string,
+  otp: string
 ): Promise<boolean> {
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
-    const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${token}`;
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+  const verificationUrl = `${baseUrl}/api/auth/verify-email?token=${token}`;
 
-    const mailOptions = {
-        from: `"${process.env.FROM_NAME || 'Smart Fish Care System'}" <${process.env.FROM_EMAIL}>`,
-        to: email,
-        subject: 'Verify Your Email - Smart Fish Care',
-        html: `
+  const mailOptions = {
+    from: `"${process.env.FROM_NAME || 'Smart Fish Care System'}" <${process.env.FROM_EMAIL || process.env.SMTP_USER}>`,
+    to: email,
+    subject: 'Verify Your Email - Smart Fish Care',
+    html: `
       <!DOCTYPE html>
       <html>
       <head>
@@ -79,14 +94,84 @@ export async function sendVerificationEmail(
       </body>
       </html>
     `,
-    };
+  };
 
-    try {
-        await transporter.sendMail(mailOptions);
-        return true;
-    } catch (error) {
-        console.error('Email sending failed:', error);
-        return false;
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Verification email sent successfully:', info.messageId);
+    return true;
+  } catch (error: any) {
+    console.error('Email sending failed:', error);
+    if (error.code === 'EAUTH') {
+      console.error('Authentication failed. Please check your SMTP credentials.');
     }
+    return false;
+  }
 }
 
+export async function sendOTPEmail(
+  email: string,
+  username: string,
+  otp: string
+): Promise<boolean> {
+  const mailOptions = {
+    from: `"${process.env.FROM_NAME || 'Smart Fish Care System'}" <${process.env.FROM_EMAIL || process.env.SMTP_USER}>`,
+    to: email,
+    subject: 'OTP Verification Code - Smart Fish Care',
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: linear-gradient(135deg, #7c5cff, #4cc9f0); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
+          .content { padding: 20px; background-color: #f9f9f9; }
+          .otp-box { background-color: #fff; padding: 20px; border: 2px solid #7c5cff; border-radius: 10px; text-align: center; margin: 20px 0; }
+          .otp-code { font-size: 36px; font-weight: bold; color: #7c5cff; letter-spacing: 8px; font-family: 'Courier New', monospace; }
+          .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+          .warning { background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 10px; margin: 15px 0; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>🔐 OTP Verification</h1>
+          </div>
+          <div class="content">
+            <p>Hello ${username},</p>
+            <p>You have requested an OTP verification code. Use the code below to verify your email address:</p>
+            
+            <div class="otp-box">
+              <p style="margin-bottom: 10px; font-weight: 600;">Your Verification Code:</p>
+              <div class="otp-code">${otp}</div>
+              <p style="font-size: 12px; color: #666; margin-top: 10px;">This code expires in 15 minutes</p>
+            </div>
+            
+            <div class="warning">
+              <p style="margin: 0;"><strong>Security Notice:</strong> Never share this code with anyone. Smart Fish Care will never ask for your verification code.</p>
+            </div>
+            
+            <p>If you didn't request this code, please ignore this email or contact support if you have concerns.</p>
+          </div>
+          <div class="footer">
+            <p>&copy; 2025 Smart Fish Care System. All rights reserved.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+  };
+
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log('OTP email sent successfully:', info.messageId);
+    return true;
+  } catch (error: any) {
+    console.error('OTP email sending failed:', error);
+    if (error.code === 'EAUTH') {
+      console.error('Authentication failed. Please check your SMTP credentials.');
+    }
+    return false;
+  }
+}

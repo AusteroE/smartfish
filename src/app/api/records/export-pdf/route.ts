@@ -9,128 +9,356 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
     }
 
+    // Get user data
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { username: true, email: true },
+    });
+
+    if (!user) {
+      return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 });
+    }
+
     // Fetch all records data
     const [fishRanges, waterParams, stockingRecords, harvestRecords, feedingRecords] = await Promise.all([
       prisma.fishSizeRange.findMany({ orderBy: { minLength: 'asc' } }),
       prisma.waterParameter.findMany({ orderBy: { parameterName: 'asc' } }),
       prisma.stockingRecord.findMany({ where: { userId }, orderBy: { stockDate: 'desc' } }),
       prisma.harvestRecord.findMany({ where: { userId }, orderBy: { harvestDate: 'desc' } }),
-      prisma.feedingRecord.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } }),
+      prisma.feedingRecord.findMany({ where: { userId }, orderBy: { feedingTime: 'asc' } }),
     ]);
 
-    // Generate simple HTML PDF
-    const htmlContent = `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <title>Smart Fish Care - Records Report</title>
-        <style>
-          body { font-family: Arial, sans-serif; margin: 20px; color: #333; }
-          .header { text-align: center; margin-bottom: 30px; }
-          .logo { font-size: 24px; font-weight: bold; margin-bottom: 10px; }
-          .section { margin-bottom: 30px; }
-          .section h2 { color: #7c5cff; border-bottom: 2px solid #7c5cff; padding-bottom: 5px; }
-          table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-          th { background-color: #7c5cff; color: white; }
-          tr:nth-child(even) { background-color: #f2f2f2; }
-          .footer { margin-top: 40px; text-align: center; font-size: 12px; color: #666; }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <div class="logo">SMART FISH CARE</div>
-          <h1>Records Report</h1>
-          <p>Generated on: ${new Date().toLocaleString()}</p>
-        </div>
+    const timestamp = new Date().toLocaleString('en-US', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+    });
 
-        <div class="section">
-          <h2>Fish Size Ranges</h2>
-          <table>
-            <tr><th>Category</th><th>Length (cm)</th><th>Width (cm)</th></tr>
-            ${fishRanges.map(r => `
-              <tr>
-                <td>${r.category}</td>
-                <td>${Number(r.minLength)}${r.maxLength ? ` - ${Number(r.maxLength)}` : '+'}</td>
-                <td>${Number(r.minWidth)}${r.maxWidth ? ` - ${Number(r.maxWidth)}` : '+'}</td>
-              </tr>
-            `).join('')}
-          </table>
+    // Generate HTML report matching PHP version
+    const htmlContent = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fish Care Records Report</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: white;
+            color: #333;
+        }
+        .header {
+            margin-bottom: 30px;
+            border-bottom: 2px solid #0e4d92;
+            padding-bottom: 20px;
+        }
+        .logo-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+        }
+        .logo-left {
+            max-width: 150px;
+            height: auto;
+            flex-shrink: 0;
+        }
+        .logo-right {
+            max-width: 150px;
+            height: auto;
+            flex-shrink: 0;
+        }
+        .logo-right-img {
+            max-width: 100%;
+            height: auto;
+            object-fit: contain;
+        }
+        .header-center {
+            text-align: center;
+            flex-grow: 1;
+            padding: 0 20px;
+        }
+        .report-title {
+            font-size: 24px;
+            font-weight: bold;
+            color: #0e4d92;
+            margin: 10px 0;
+        }
+        .user-info {
+            font-size: 14px;
+            color: #666;
+            margin: 5px 0;
+        }
+        .section {
+            margin: 30px 0;
+            page-break-inside: avoid;
+        }
+        .section-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #0e4d92;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 5px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 10px 0;
+            table-layout: fixed;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+            word-wrap: break-word;
+            word-break: break-word;
+            white-space: normal;
+            overflow-wrap: break-word;
+        }
+        th {
+            background-color: #f5f5f5;
+            font-weight: bold;
+        }
+        .no-data {
+            text-align: center;
+            color: #666;
+            font-style: italic;
+            padding: 20px;
+        }
+        .fish-ranges-table th:nth-child(1),
+        .fish-ranges-table td:nth-child(1) { width: 20%; }
+        .fish-ranges-table th:nth-child(2),
+        .fish-ranges-table td:nth-child(2) { width: 40%; }
+        .fish-ranges-table th:nth-child(3),
+        .fish-ranges-table td:nth-child(3) { width: 40%; }
+        .water-params-table th:nth-child(1),
+        .water-params-table td:nth-child(1) { width: 25%; }
+        .water-params-table th:nth-child(2),
+        .water-params-table td:nth-child(2) { width: 25%; }
+        .water-params-table th:nth-child(3),
+        .water-params-table td:nth-child(3) { width: 25%; }
+        .water-params-table th:nth-child(4),
+        .water-params-table td:nth-child(4) { width: 25%; }
+        .stocking-table th:nth-child(1),
+        .stocking-table td:nth-child(1) { width: 25%; }
+        .stocking-table th:nth-child(2),
+        .stocking-table td:nth-child(2) { width: 20%; }
+        .stocking-table th:nth-child(3),
+        .stocking-table td:nth-child(3) { width: 20%; }
+        .stocking-table th:nth-child(4),
+        .stocking-table td:nth-child(4) { width: 15%; }
+        .stocking-table th:nth-child(5),
+        .stocking-table td:nth-child(5) { width: 20%; }
+        .harvest-table th:nth-child(1),
+        .harvest-table td:nth-child(1) { width: 20%; }
+        .harvest-table th:nth-child(2),
+        .harvest-table td:nth-child(2) { width: 10%; }
+        .harvest-table th:nth-child(3),
+        .harvest-table td:nth-child(3) { width: 15%; }
+        .harvest-table th:nth-child(4),
+        .harvest-table td:nth-child(4) { width: 20%; }
+        .harvest-table th:nth-child(5),
+        .harvest-table td:nth-child(5) { width: 15%; }
+        .harvest-table th:nth-child(6),
+        .harvest-table td:nth-child(6) { width: 20%; }
+        .feeding-table th:nth-child(1),
+        .feeding-table td:nth-child(1) { width: 15%; }
+        .feeding-table th:nth-child(2),
+        .feeding-table td:nth-child(2) { width: 35%; }
+        .feeding-table th:nth-child(3),
+        .feeding-table td:nth-child(3) { width: 20%; }
+        .feeding-table th:nth-child(4),
+        .feeding-table td:nth-child(4) { width: 30%; }
+        @media print {
+            body { margin: 0; }
+            .no-print { display: none; }
+            .logo-container { page-break-inside: avoid; }
+            .logo-left, .logo-right, .logo-right-img { max-width: 120px; }
+        }
+        @media screen and (max-width: 768px) {
+            .logo-container { flex-direction: column; gap: 15px; }
+            .header-center { padding: 0; }
+            .logo-left, .logo-right, .logo-right-img { max-width: 100px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo-container">
+            <img src="${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/smartfishcarelogo.png" alt="Smart Fish Care Logo" class="logo-left" onerror="this.style.display='none'">
+            <div class="header-center">
+                <div class="report-title">Fish Care Records Report</div>
+                <div class="user-info">Generated for: ${escapeHtml(user.username)} (${escapeHtml(user.email)})</div>
+                <div class="user-info">Generated on: ${timestamp}</div>
+            </div>
+            <div class="logo-right">
+                <img src="${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/frontend/img/print_logo.jpg" alt="USTP Logo" class="logo-right-img" onerror="this.style.display='none'">
+            </div>
         </div>
+    </div>
+    
+    <div class="section">
+        <div class="section-title">Fish Size Ranges</div>
+        <table class="fish-ranges-table">
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th>Length (cm)</th>
+                    <th>Width (cm)</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${fishRanges.length > 0 ? fishRanges.map(range => `
+                    <tr>
+                        <td>${escapeHtml(range.category)}</td>
+                        <td>${Number(range.minLength)}${range.maxLength ? ' - ' + Number(range.maxLength) : '+'}</td>
+                        <td>${Number(range.minWidth)}${range.maxWidth ? ' - ' + Number(range.maxWidth) : '+'}</td>
+                    </tr>
+                `).join('') : '<tr><td colspan="3" class="no-data">No fish size ranges found.</td></tr>'}
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="section">
+        <div class="section-title">Water Parameters</div>
+        <table class="water-params-table">
+            <thead>
+                <tr>
+                    <th>Parameter</th>
+                    <th>Normal Range</th>
+                    <th>Danger Range</th>
+                    <th>Unit</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${waterParams.length > 0 ? waterParams.map(param => {
+      const dangerRange = (param.dangerMin !== null && param.dangerMax !== null)
+        ? `${Number(param.dangerMin)} - ${Number(param.dangerMax)}`
+        : 'N/A';
+      return `
+                        <tr>
+                            <td>${escapeHtml(param.parameterName)}</td>
+                            <td>${Number(param.normalMin)} - ${Number(param.normalMax)}</td>
+                            <td>${dangerRange}</td>
+                            <td>${escapeHtml(param.unit)}</td>
+                        </tr>
+                    `;
+    }).join('') : '<tr><td colspan="4" class="no-data">No water parameters found.</td></tr>'}
+            </tbody>
+        </table>
+    </div>
+    
+    <div class="section">
+        <div class="section-title">Stocking Records</div>
+        ${stockingRecords.length > 0 ? `
+            <table class="stocking-table">
+                <thead>
+                    <tr>
+                        <th>Fish Type</th>
+                        <th>Stock Date</th>
+                        <th>Aquarium #</th>
+                        <th>Quantity</th>
+                        <th>Notes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${stockingRecords.map(record => `
+                        <tr>
+                            <td>${escapeHtml(record.fishType)}</td>
+                            <td>${new Date(record.stockDate).toLocaleDateString()}</td>
+                            <td>${escapeHtml(record.aquariumNumber)}</td>
+                            <td>${record.quantity ?? 'N/A'}</td>
+                            <td>${record.notes ? escapeHtml(record.notes) : 'N/A'}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        ` : '<div class="no-data">No stocking records found.</div>'}
+    </div>
+    
+    <div class="section">
+        <div class="section-title">Harvest Records</div>
+        ${harvestRecords.length > 0 ? `
+            <table class="harvest-table">
+                <thead>
+                    <tr>
+                        <th>Fish Type</th>
+                        <th>Quantity</th>
+                        <th>Size</th>
+                        <th>Harvest Date</th>
+                        <th>Aquarium #</th>
+                        <th>Weight (kg)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${harvestRecords.map(record => `
+                        <tr>
+                            <td>${escapeHtml(record.fishType)}</td>
+                            <td>${record.quantity}</td>
+                            <td>${escapeHtml(record.size)}</td>
+                            <td>${new Date(record.harvestDate).toLocaleDateString()}</td>
+                            <td>${escapeHtml(record.aquariumNumber)}</td>
+                            <td>${record.weight ? Number(record.weight).toFixed(2) : 'N/A'}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        ` : '<div class="no-data">No harvest records found.</div>'}
+    </div>
+    
+    <div class="section">
+        <div class="section-title">Feeding Records</div>
+        ${feedingRecords.length > 0 ? `
+            <table class="feeding-table">
+                <thead>
+                    <tr>
+                        <th>Fish Size</th>
+                        <th>Food Type</th>
+                        <th>Feeding Time</th>
+                        <th>Quantity</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${feedingRecords.map(record => `
+                        <tr>
+                            <td>${escapeHtml(record.fishSize)}</td>
+                            <td>${escapeHtml(record.foodType)}</td>
+                            <td>${escapeHtml(String(record.feedingTime))}</td>
+                            <td>${record.quantity ?? 'N/A'}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        ` : '<div class="no-data">No feeding records found.</div>'}
+    </div>
+    
+    <div class="no-print" style="text-align: center; margin-top: 30px;">
+        <button onclick="window.print()" style="background: #0e4d92; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;">
+            Print as PDF
+        </button>
+    </div>
+    
+    <script>
+        // Auto-print when page loads
+        window.onload = function() {
+            setTimeout(function() {
+                window.print();
+            }, 1000);
+        };
+    </script>
+</body>
+</html>`;
 
-        <div class="section">
-          <h2>Water Parameters</h2>
-          <table>
-            <tr><th>Parameter</th><th>Normal Range</th><th>Danger Range</th></tr>
-            ${waterParams.map(p => `
-              <tr>
-                <td>${p.parameterName}</td>
-                <td>${Number(p.normalMin)} - ${Number(p.normalMax)} ${p.unit}</td>
-                <td>${p.dangerMin || p.dangerMax ? `${p.dangerMin ? '< ' + Number(p.dangerMin) + ' ' : ''}${p.dangerMax ? '> ' + Number(p.dangerMax) : ''} ${p.unit}` : '--'}</td>
-              </tr>
-            `).join('')}
-          </table>
-        </div>
-
-        <div class="section">
-          <h2>Stocking Records (${stockingRecords.length})</h2>
-          <table>
-            <tr><th>Date</th><th>Fish Type</th><th>Aquarium</th><th>Quantity</th></tr>
-            ${stockingRecords.map(r => `
-              <tr>
-                <td>${new Date(r.stockDate).toLocaleDateString()}</td>
-                <td>${r.fishType}</td>
-                <td>${r.aquariumNumber}</td>
-                <td>${r.quantity || '--'}</td>
-              </tr>
-            `).join('')}
-          </table>
-        </div>
-
-        <div class="section">
-          <h2>Harvest Records (${harvestRecords.length})</h2>
-          <table>
-            <tr><th>Date</th><th>Fish Type</th><th>Quantity</th><th>Size</th><th>Weight (kg)</th></tr>
-            ${harvestRecords.map(r => `
-              <tr>
-                <td>${new Date(r.harvestDate).toLocaleDateString()}</td>
-                <td>${r.fishType}</td>
-                <td>${r.quantity}</td>
-                <td>${r.size}</td>
-                <td>${r.weight ? Number(r.weight).toFixed(2) : '--'}</td>
-              </tr>
-            `).join('')}
-          </table>
-        </div>
-
-        <div class="section">
-          <h2>Feeding Records (${feedingRecords.length})</h2>
-          <table>
-            <tr><th>Date</th><th>Time</th><th>Fish Size</th><th>Food Type</th><th>Quantity</th></tr>
-            ${feedingRecords.map(r => `
-              <tr>
-                <td>${new Date(r.createdAt).toLocaleDateString()}</td>
-                <td>${r.feedingTime}</td>
-                <td>${r.fishSize}</td>
-                <td>${r.foodType}</td>
-                <td>${r.quantity || '--'}</td>
-              </tr>
-            `).join('')}
-          </table>
-        </div>
-
-        <div class="footer">
-          <p>Smart Fish Care System - Automated Records Report</p>
-        </div>
-      </body>
-      </html>
-    `;
-
-    // Return HTML content that can be printed as PDF
+    // Return HTML content that opens in new window and auto-prints
     return new NextResponse(htmlContent, {
       headers: {
-        'Content-Type': 'text/html',
+        'Content-Type': 'text/html; charset=utf-8',
         'Content-Disposition': 'inline; filename="fish-care-report.html"',
       },
     });
@@ -141,5 +369,15 @@ export async function GET(request: NextRequest) {
       { status: 500 }
     );
   }
+}
+
+function escapeHtml(text: string | null | undefined): string {
+  if (!text) return '';
+  return String(text)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
 }
 

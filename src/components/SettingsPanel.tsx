@@ -5,270 +5,321 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
 interface User {
-    id: number;
-    username: string;
-    email: string;
-    profile_image: string;
+  id: number;
+  username: string;
+  email: string;
+  profile_image: string;
+  role?: string;
 }
 
 interface SettingsPanelProps {
-    isOpen: boolean;
-    onClose: () => void;
-    user: User | null;
+  isOpen: boolean;
+  onClose: () => void;
+  user: User | null;
+  onUserUpdate?: (updatedUser: User) => void;
 }
 
-export default function SettingsPanel({ isOpen, onClose, user }: SettingsPanelProps) {
-    const router = useRouter();
-    const [loading, setLoading] = useState(false);
+export default function SettingsPanel({ isOpen, onClose, user, onUserUpdate }: SettingsPanelProps) {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
+  const [profileImage, setProfileImage] = useState<string | null>(null);
+  const [profileFile, setProfileFile] = useState<File | null>(null);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [uploading, setUploading] = useState(false);
 
-    const handleLogout = async () => {
-        if (confirm('Are you sure you want to logout?')) {
-            setLoading(true);
-            try {
-                await fetch('/api/auth/logout', { method: 'POST' });
-                router.push('/');
-            } catch (error) {
-                console.error('Logout error:', error);
-            } finally {
-                setLoading(false);
-            }
+  useEffect(() => {
+    if (user) {
+      setUsername(user.username);
+      setEmail(user.email);
+      setProfileImage(null);
+    }
+  }, [user]);
+
+  const handleProfileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const maxSize = 10 * 1024 * 1024; // 10MB
+      const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
+
+      if (!allowedTypes.includes(file.type)) {
+        setError('Only JPG, PNG, and GIF images are allowed.');
+        return;
+      }
+
+      if (file.size > maxSize) {
+        setError('Image size should be less than or equal to 10MB.');
+        return;
+      }
+
+      setProfileFile(file);
+      setError('');
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setProfileImage(e.target?.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!username || !email) {
+      setError('Username and email are required');
+      return;
+    }
+
+    setUploading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const formData = new FormData();
+      formData.append('username', username);
+      formData.append('email', email);
+      if (profileFile) {
+        formData.append('profile', profileFile);
+      }
+
+      const response = await fetch('/api/user/update', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        setSuccess('Profile updated successfully!');
+        setEditing(false);
+        setProfileFile(null);
+        setProfileImage(null);
+
+        // Update parent component if callback provided
+        if (onUserUpdate && data.user) {
+          onUserUpdate({
+            ...data.user,
+            role: data.user.role || user?.role || 'user',
+          });
         }
-    };
 
-    if (!isOpen || !user) return null;
+        // Reload page after 1 second to refresh user data
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
+      } else {
+        setError(data.error || 'Failed to update profile');
+      }
+    } catch (err) {
+      console.error('Profile update error:', err);
+      setError('An error occurred. Please try again.');
+    } finally {
+      setUploading(false);
+    }
+  };
 
-    return (
-        <>
-            <div className="settings-overlay" onClick={onClose}></div>
-            <section className="settings-panel">
-                <button className="close-btn" onClick={onClose}>
-                    &times;
-                </button>
-                <h2>
-                    Settings
-                    <i className="fas fa-cog settings-icon"></i>
-                </h2>
+  const handleCancel = () => {
+    setEditing(false);
+    setError('');
+    setSuccess('');
+    if (user) {
+      setUsername(user.username);
+      setEmail(user.email);
+      setProfileImage(null);
+      setProfileFile(null);
+    }
+  };
 
-                <div className="settings-theme">
-                    <label>Theme:</label>
-                    <div className="custom-dropdown" style={{ pointerEvents: 'none' }}>
-                        <div className="dropdown-label">
-                            Dark Mode
-                            <span className="arrow">&#9662;</span>
-                        </div>
-                    </div>
-                </div>
+  const handleLogout = async () => {
+    if (confirm('Are you sure you want to logout?')) {
+      setLoading(true);
+      try {
+        await fetch('/api/auth/logout', {
+          method: 'POST',
+          credentials: 'include',
+        });
+        router.push('/');
+      } catch (error) {
+        console.error('Logout error:', error);
+      } finally {
+        setLoading(false);
+      }
+    }
+  };
 
-                <div className="profile">
-                    <label htmlFor="profile-info">Profile:</label>
-                    <div className="profile-row">
-                        <Image
-                            src={user.profile_image?.startsWith('/')
-                                ? user.profile_image
-                                : user.profile_image?.startsWith('frontend/')
-                                    ? `/${user.profile_image}`
-                                    : `/frontend/img/${user.profile_image || 'default profile.png'}`}
-                            alt="Profile Picture"
-                            width={80}
-                            height={80}
-                            style={{ borderRadius: '50%', objectFit: 'cover' }}
-                            onError={(e) => {
-                                e.currentTarget.src = '/frontend/img/default profile.png';
-                            }}
-                        />
-                        <div className="profile-info">
-                            <span>
-                                <strong>Username:</strong> {user.username}
-                            </span>
-                            <span>
-                                <strong>Email:</strong> {user.email}
-                            </span>
-                            <span>
-                                <strong>Password:</strong> ••••••••
-                            </span>
-                            <button className="edit-btn" title="Edit Profile">
-                                <i className="fas fa-edit"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>
+  const getProfileImageSrc = () => {
+    if (profileImage) return profileImage;
+    if (!user?.profile_image) {
+      return '/frontend/img/default profile.png';
+    }
+    if (user.profile_image.startsWith('/')) {
+      return user.profile_image;
+    }
+    if (user.profile_image.startsWith('uploads/')) {
+      return `/${user.profile_image}`;
+    }
+    if (user.profile_image.startsWith('frontend/')) {
+      return `/${user.profile_image}`;
+    }
+    return `/frontend/img/${user.profile_image}`;
+  };
 
-                <div className="account-actions">
-                    <button className="action-btn logout-btn" onClick={handleLogout} disabled={loading}>
-                        <i className="fas fa-sign-out-alt"></i>
-                        <span>{loading ? 'Logging out...' : 'Logout'}</span>
+  if (!isOpen || !user) return null;
+
+  return (
+    <>
+      <div
+        className="fixed inset-0 z-[999] bg-black/50"
+        onClick={onClose}
+      ></div>
+      <section className="fixed right-0 top-0 z-[1000] h-screen w-full sm:w-[420px] overflow-y-auto border-l border-white/14 bg-gradient-to-b from-white/7 to-white/2 p-4 sm:p-8 shadow-[-10px_0_30px_rgba(0,0,0,0.35)] backdrop-blur-xl">
+        <button
+          className="absolute right-5 top-5 h-10 w-10 rounded-full border-none bg-white/10 text-[28px] text-[#e6e9ef] transition-all hover:bg-white/20"
+          onClick={onClose}
+        >
+          &times;
+        </button>
+        <h2 className="mb-8 text-[1.8rem] font-bold text-[#e6e9ef]">
+          Settings
+          <i className="ml-2.5 text-[#7c5cff] fas fa-cog"></i>
+        </h2>
+
+        {/* Success Message */}
+        {success && (
+          <div className="mb-4 p-3 bg-green-500/20 border border-green-500/30 rounded-lg text-sm text-green-300">
+            <i className="fas fa-check-circle mr-2"></i>
+            {success}
+          </div>
+        )}
+
+        {/* Error Message */}
+        {error && (
+          <div className="mb-4 p-3 bg-red-500/20 border border-red-500/30 rounded-lg text-sm text-red-300">
+            <i className="fas fa-exclamation-circle mr-2"></i>
+            {error}
+          </div>
+        )}
+
+        <div className="mb-8 rounded-xl border border-white/12 bg-gradient-to-b from-white/6 to-white/2 p-5">
+          <div className="flex items-center justify-between mb-4">
+            <label className="block font-medium text-[#e6e9ef]">Profile</label>
+            {!editing && (
+              <button
+                onClick={() => setEditing(true)}
+                className="px-3 py-1.5 rounded-lg border border-[#7c5cff]/35 bg-[#7c5cff]/20 text-sm text-[#7c5cff] transition-all hover:bg-[#7c5cff]/30"
+                title="Edit Profile"
+              >
+                <i className="fas fa-edit mr-2"></i>Edit
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-start gap-5">
+            <div className="relative w-[80px] h-[80px] rounded-full overflow-hidden border-2 border-white/10 flex-shrink-0">
+              <Image
+                src={getProfileImageSrc()}
+                alt="Profile Picture"
+                width={80}
+                height={80}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  e.currentTarget.src = '/frontend/img/default profile.png';
+                }}
+              />
+              {editing && (
+                <label
+                  htmlFor="profileInput"
+                  className="absolute bottom-0 right-0 bg-[#7c5cff] w-8 h-8 rounded-full flex items-center justify-center cursor-pointer border-2 border-[#0b1020] hover:bg-[#6b4ce6] transition-colors z-10"
+                  title="Change Profile Picture"
+                >
+                  <i className="fas fa-camera text-white text-xs"></i>
+                </label>
+              )}
+              <input
+                type="file"
+                id="profileInput"
+                accept="image/*"
+                onChange={handleProfileChange}
+                className="hidden"
+                disabled={!editing}
+              />
+            </div>
+
+            <div className="flex flex-1 flex-col gap-3">
+              {editing ? (
+                <>
+                  <div>
+                    <label className="block text-xs text-[#a2a8b6] mb-1">Username</label>
+                    <input
+                      type="text"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      className="w-full px-3 py-2 bg-white/4 border border-white/12 rounded-lg text-sm text-[#e6e9ef] focus:outline-none focus:border-[#7c5cff] focus:ring-1 focus:ring-[#7c5cff]/20"
+                      placeholder="Enter username"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-[#a2a8b6] mb-1">Email</label>
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="w-full px-3 py-2 bg-white/4 border border-white/12 rounded-lg text-sm text-[#e6e9ef] focus:outline-none focus:border-[#7c5cff] focus:ring-1 focus:ring-[#7c5cff]/20"
+                      placeholder="Enter email"
+                    />
+                  </div>
+                  <div className="flex gap-2 mt-2">
+                    <button
+                      onClick={handleSave}
+                      disabled={uploading}
+                      className="flex-1 px-4 py-2 bg-[#7c5cff] text-white rounded-lg text-sm font-semibold hover:bg-[#6b4ce6] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {uploading ? (
+                        <>
+                          <i className="fas fa-spinner fa-spin mr-2"></i>Saving...
+                        </>
+                      ) : (
+                        <>
+                          <i className="fas fa-save mr-2"></i>Save
+                        </>
+                      )}
                     </button>
-                </div>
+                    <button
+                      onClick={handleCancel}
+                      disabled={uploading}
+                      className="px-4 py-2 bg-white/4 border border-white/12 text-[#e6e9ef] rounded-lg text-sm font-semibold hover:bg-white/6 transition-all disabled:opacity-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <span className="text-sm text-[#e6e9ef]">
+                    <strong>Username:</strong> {user.username}
+                  </span>
+                  <span className="text-sm text-[#e6e9ef]">
+                    <strong>Email:</strong> {user.email}
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
 
-                <style jsx>{`
-          .settings-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            z-index: 999;
-          }
-
-          .settings-panel {
-            position: fixed;
-            top: 0;
-            right: 0;
-            width: 420px;
-            height: 100vh;
-            background: linear-gradient(180deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.02));
-            border-left: 1px solid rgba(255, 255, 255, 0.14);
-            backdrop-filter: blur(12px);
-            padding: 30px;
-            z-index: 1000;
-            overflow-y: auto;
-            box-shadow: -10px 0 30px rgba(0, 0, 0, 0.35);
-          }
-
-          .close-btn {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            background: rgba(255, 255, 255, 0.1);
-            border: none;
-            color: #e6e9ef;
-            font-size: 28px;
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            cursor: pointer;
-            transition: all 0.3s ease;
-          }
-
-          .close-btn:hover {
-            background: rgba(255, 255, 255, 0.2);
-          }
-
-          .settings-panel h2 {
-            color: #e6e9ef;
-            margin-bottom: 30px;
-            font-size: 1.8rem;
-            font-weight: 700;
-          }
-
-          .settings-icon {
-            margin-left: 10px;
-            color: #7c5cff;
-          }
-
-          .settings-theme {
-            margin-bottom: 30px;
-          }
-
-          .settings-theme label {
-            display: block;
-            color: #e6e9ef;
-            margin-bottom: 10px;
-            font-weight: 500;
-          }
-
-          .custom-dropdown {
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            border-radius: 8px;
-            padding: 12px;
-            color: #e6e9ef;
-          }
-
-          .profile {
-            background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 30px;
-          }
-
-          .profile label {
-            display: block;
-            color: #e6e9ef;
-            margin-bottom: 15px;
-            font-weight: 500;
-          }
-
-          .profile-row {
-            display: flex;
-            align-items: flex-start;
-            gap: 20px;
-          }
-
-          .profile-info {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-          }
-
-          .profile-info span {
-            color: #e6e9ef;
-            font-size: 0.9rem;
-          }
-
-          .edit-btn {
-            background: rgba(124, 92, 255, 0.2);
-            border: 1px solid rgba(124, 92, 255, 0.35);
-            color: #7c5cff;
-            padding: 8px 16px;
-            border-radius: 8px;
-            cursor: pointer;
-            margin-top: 10px;
-            transition: all 0.3s ease;
-          }
-
-          .edit-btn:hover {
-            background: rgba(124, 92, 255, 0.3);
-          }
-
-          .account-actions {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-          }
-
-          .action-btn {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-            padding: 14px 20px;
-            border: 1px solid rgba(255, 255, 255, 0.12);
-            border-radius: 12px;
-            background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
-            color: #e6e9ef;
-            font-size: 14px;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-          }
-
-          .action-btn:hover:not(:disabled) {
-            transform: translateY(-2px);
-            border-color: rgba(124, 92, 255, 0.45);
-            box-shadow: 0 8px 20px rgba(124, 92, 255, 0.18);
-          }
-
-          .logout-btn:hover:not(:disabled) {
-            background: linear-gradient(180deg, rgba(124, 92, 255, 0.15), rgba(124, 92, 255, 0.08));
-          }
-
-          .action-btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-          }
-
-          @media (max-width: 768px) {
-            .settings-panel {
-              width: 100%;
-            }
-          }
-        `}</style>
-            </section>
-        </>
-    );
+        <div className="flex flex-col gap-3">
+          <button
+            className="logout-btn flex items-center justify-center gap-3 rounded-xl border border-white/12 bg-gradient-to-b from-white/5 to-white/2 px-5 py-4 text-sm font-semibold text-[#e6e9ef] transition-all hover:-translate-y-0.5 hover:border-[#7c5cff]/45 hover:bg-gradient-to-b hover:from-[#7c5cff]/15 hover:to-[#7c5cff]/8 hover:shadow-[0_8px_20px_rgba(124,92,255,0.18)] disabled:cursor-not-allowed disabled:opacity-60"
+            onClick={handleLogout}
+            disabled={loading}
+          >
+            <i className="fas fa-sign-out-alt"></i>
+            <span>{loading ? 'Logging out...' : 'Logout'}</span>
+          </button>
+        </div>
+      </section>
+    </>
+  );
 }
-

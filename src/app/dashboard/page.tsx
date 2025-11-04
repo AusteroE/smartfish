@@ -116,24 +116,24 @@ export default function DashboardPage() {
 
   return (
     <>
-      <header className="text-center mb-10">
+      <header className="text-center mb-6 sm:mb-10">
         <Image
           src="/smartfishcarelogo.png"
           alt="Smart Fish Care Logo"
           width={150}
           height={150}
-          className="mx-auto mb-2 drop-shadow-lg"
+          className="mx-auto mb-2 drop-shadow-lg w-24 h-24 sm:w-32 sm:h-32 md:w-[150px] md:h-[150px]"
           priority
         />
-        <h1 className="text-4xl font-extrabold text-[#e6e9ef] mb-2">Dashboard</h1>
-        <div className="mt-4">
-          <p className="text-lg text-[#e6e9ef]">
+        <h1 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-[#e6e9ef] mb-2">Dashboard</h1>
+        <div className="mt-3 sm:mt-4">
+          <p className="text-sm sm:text-base md:text-lg text-[#e6e9ef]">
             Connection Status:{' '}
             <span className={connectionStatus ? 'text-green-500' : 'text-red-500'}>
               {connectionStatus ? 'Connected' : 'Not Connected'}
             </span>
           </p>
-          <p id="data-status" className={`mt-2 ${connectionStatus ? 'text-[#a2a8b6]' : 'text-red-500'}`}>
+          <p id="data-status" className={`mt-2 text-xs sm:text-sm ${connectionStatus ? 'text-[#a2a8b6]' : 'text-red-500'}`}>
             {connectionStatus ? (
               sensorData.ph !== null || sensorData.temperature !== null
                 ? `Last updated: ${new Date().toLocaleTimeString()}`
@@ -145,12 +145,12 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-5">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 pt-5">
         {/* Water Temperature Card */}
-        <div className="bg-gradient-to-b from-white/6 to-white/2 border border-white/8 rounded-2xl p-8 min-h-[180px] backdrop-blur-sm shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
-          <h3 className="text-xl font-semibold text-[#e6e9ef] mb-5">Water Temperature</h3>
+        <div className="bg-gradient-to-b from-white/6 to-white/2 border border-white/8 rounded-xl sm:rounded-2xl p-5 sm:p-8 min-h-[160px] sm:min-h-[180px] backdrop-blur-sm shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+          <h3 className="text-lg sm:text-xl font-semibold text-[#e6e9ef] mb-4 sm:mb-5">Water Temperature</h3>
           <div className="text-center py-2">
-            <div className={`text-4xl font-bold ${tempStatus.color === 'green' ? 'text-green-500' :
+            <div className={`text-3xl sm:text-4xl font-bold ${tempStatus.color === 'green' ? 'text-green-500' :
               tempStatus.color === 'orange' ? 'text-orange-500' :
                 tempStatus.color === 'red' ? 'text-red-500' :
                   'text-gray-500'
@@ -161,24 +161,24 @@ export default function DashboardPage() {
         </div>
 
         {/* Fish Sizes Card */}
-        <div className="bg-gradient-to-b from-white/6 to-white/2 border border-white/8 rounded-2xl p-8 min-h-[180px] backdrop-blur-sm shadow-[0_10px_30px_rgba(0,0,0,0.35)] cursor-pointer hover:scale-105 transition-transform"
+        <div className="bg-gradient-to-b from-white/6 to-white/2 border border-white/8 rounded-xl sm:rounded-2xl p-5 sm:p-8 min-h-[160px] sm:min-h-[180px] backdrop-blur-sm shadow-[0_10px_30px_rgba(0,0,0,0.35)] cursor-pointer hover:scale-105 transition-transform"
           onClick={() => setCameraModalOpen(true)}>
-          <h3 className="text-xl font-semibold text-[#e6e9ef] mb-5">Fish Sizes</h3>
+          <h3 className="text-lg sm:text-xl font-semibold text-[#e6e9ef] mb-4 sm:mb-5">Fish Sizes</h3>
           <div className="flex flex-col items-center justify-center h-full">
-            <div className="w-20 h-20 bg-[#7c5cff]/20 rounded-full flex items-center justify-center mb-3">
-              <i className="fas fa-camera text-3xl text-[#7c5cff]"></i>
+            <div className="w-16 h-16 sm:w-20 sm:h-20 bg-[#7c5cff]/20 rounded-full flex items-center justify-center mb-3">
+              <i className="fas fa-camera text-2xl sm:text-3xl text-[#7c5cff]"></i>
             </div>
-            <p className="text-[#a2a8b6] text-sm">Connect your Web cam</p>
+            <p className="text-[#a2a8b6] text-xs sm:text-sm">Connect your Web cam</p>
           </div>
         </div>
 
         {/* Water Quality Level Card */}
-        <div className="bg-gradient-to-b from-white/6 to-white/2 border border-white/8 rounded-2xl p-8 min-h-[180px] backdrop-blur-sm shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
-          <h3 className="text-xl font-semibold text-[#e6e9ef] mb-5">Water Quality Level</h3>
+        <div className="bg-gradient-to-b from-white/6 to-white/2 border border-white/8 rounded-xl sm:rounded-2xl p-5 sm:p-8 min-h-[160px] sm:min-h-[180px] backdrop-blur-sm shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+          <h3 className="text-lg sm:text-xl font-semibold text-[#e6e9ef] mb-4 sm:mb-5">Water Quality Level</h3>
           <div className="text-center py-2">
             {sensorData.ph !== null && !isNaN(sensorData.ph) ? (
               <>
-                <div className={`text-4xl font-bold ${phStatus.color === 'green' ? 'text-green-500' :
+                <div className={`text-3xl sm:text-4xl font-bold ${phStatus.color === 'green' ? 'text-green-500' :
                   phStatus.color === 'orange' ? 'text-orange-500' :
                     phStatus.color === 'red' ? 'text-red-500' :
                       'text-gray-500'

@@ -4,18 +4,17 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 
-export default function CreateUserPage() {
+export default function CreateAdminPage() {
     const router = useRouter();
     const [username, setUsername] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
-    const [role, setRole] = useState<'admin' | 'user'>('user');
-    const [skipEmailVerification, setSkipEmailVerification] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [profileImage, setProfileImage] = useState<string | null>(null);
     const [profileFile, setProfileFile] = useState<File | null>(null);
+    const [skipEmailVerification, setSkipEmailVerification] = useState(true); // Default to true for admin accounts
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
     const [success, setSuccess] = useState(false);
@@ -68,7 +67,7 @@ export default function CreateUserPage() {
             formData.append('username', username);
             formData.append('email', email);
             formData.append('password', password);
-            formData.append('role', role);
+            formData.append('role', 'admin'); // Always set to admin
             formData.append('skipEmailVerification', skipEmailVerification.toString());
             if (profileFile) {
                 formData.append('profile', profileFile);
@@ -89,8 +88,7 @@ export default function CreateUserPage() {
                 setEmail('');
                 setPassword('');
                 setConfirmPassword('');
-                setRole('user');
-                setSkipEmailVerification(false);
+                setSkipEmailVerification(true);
                 setProfileImage(null);
                 setProfileFile(null);
 
@@ -99,7 +97,7 @@ export default function CreateUserPage() {
                     router.push('/admin/dashboard');
                 }, 2000);
             } else {
-                setError(data.error || 'Failed to create user');
+                setError(data.error || 'Failed to create admin account');
             }
         } catch (err) {
             setError('An error occurred. Please try again.');
@@ -112,8 +110,13 @@ export default function CreateUserPage() {
         <div className="min-h-screen max-w-lg mx-auto py-4 sm:py-8 px-4 sm:px-6">
             {/* Header */}
             <header className="text-center mb-6">
-                <h1 className="text-2xl font-extrabold text-[#e6e9ef] mb-1">Create User Account</h1>
-                <p className="text-sm text-[#a2a8b6]">Create a new user or admin account</p>
+                <div className="flex items-center justify-center mb-3">
+                    <div className="w-12 h-12 bg-purple-500/20 rounded-full flex items-center justify-center">
+                        <i className="fas fa-user-shield text-2xl text-purple-400"></i>
+                    </div>
+                </div>
+                <h1 className="text-2xl font-extrabold text-[#e6e9ef] mb-1">Create Admin Account</h1>
+                <p className="text-sm text-[#a2a8b6]">Create a new administrator account</p>
             </header>
 
             {/* Form Card */}
@@ -121,7 +124,7 @@ export default function CreateUserPage() {
                 {success && (
                     <div className="mb-4 p-3 bg-green-500/20 border border-green-500/50 rounded-lg text-sm text-green-300">
                         <i className="fas fa-check-circle mr-2"></i>
-                        User account created successfully! Redirecting...
+                        Admin account created successfully! Redirecting...
                     </div>
                 )}
 
@@ -237,34 +240,14 @@ export default function CreateUserPage() {
                         </div>
                     </div>
 
-                    {/* Role Selection */}
-                    <div className="mb-4">
-                        <label className="block text-sm text-[#a2a8b6] mb-1.5 font-medium">
-                            <i className="fas fa-user-tag mr-1.5 text-xs"></i>Account Role
-                        </label>
-                        <div className="flex gap-4">
-                            <label className="flex items-center cursor-pointer">
-                                <input
-                                    type="radio"
-                                    name="role"
-                                    value="user"
-                                    checked={role === 'user'}
-                                    onChange={(e) => setRole(e.target.value as 'admin' | 'user')}
-                                    className="mr-2 w-4 h-4"
-                                />
-                                <span className="text-sm text-[#e6e9ef]">Regular User</span>
-                            </label>
-                            <label className="flex items-center cursor-pointer">
-                                <input
-                                    type="radio"
-                                    name="role"
-                                    value="admin"
-                                    checked={role === 'admin'}
-                                    onChange={(e) => setRole(e.target.value as 'admin' | 'user')}
-                                    className="mr-2 w-4 h-4"
-                                />
-                                <span className="text-sm text-[#e6e9ef]">Admin</span>
-                            </label>
+                    {/* Admin Badge Info */}
+                    <div className="mb-4 p-3 bg-purple-500/10 border border-purple-500/30 rounded-lg">
+                        <div className="flex items-center text-purple-300">
+                            <i className="fas fa-shield-alt mr-2 text-base"></i>
+                            <div>
+                                <p className="text-sm font-semibold">Admin Account</p>
+                                <p className="text-xs text-purple-400/80">Full administrative privileges</p>
+                            </div>
                         </div>
                     </div>
 
@@ -288,7 +271,7 @@ export default function CreateUserPage() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="flex-1 px-4 py-2.5 bg-gradient-to-r from-[#7c5cff] to-[#4cc9f0] text-white rounded-lg text-sm font-semibold hover:from-[#6b4ce6] hover:to-[#3db8d9] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                            className="flex-1 px-4 py-2.5 bg-gradient-to-r from-purple-600 to-purple-500 text-white rounded-lg text-sm font-semibold hover:from-purple-700 hover:to-purple-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                         >
                             {loading ? (
                                 <>
@@ -297,8 +280,8 @@ export default function CreateUserPage() {
                                 </>
                             ) : (
                                 <>
-                                    <i className="fas fa-user-plus text-xs"></i>
-                                    Create Account
+                                    <i className="fas fa-user-shield text-xs"></i>
+                                    Create Admin
                                 </>
                             )}
                         </button>

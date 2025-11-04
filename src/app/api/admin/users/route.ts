@@ -29,12 +29,17 @@ export async function GET(request: NextRequest) {
                 profileImage: true,
                 role: true,
                 emailVerified: true,
+                lastSeen: true,
                 createdAt: true,
             },
             orderBy: {
                 id: 'desc',
             },
         });
+
+        // Calculate online status (users seen within last 5 minutes are online)
+        const now = new Date();
+        const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
 
         return NextResponse.json({
             success: true,
@@ -43,16 +48,21 @@ export async function GET(request: NextRequest) {
                 admins: adminCount,
                 users: regularUserCount,
             },
-            users: users.map(user => ({
-                id: user.id,
-                username: user.username,
-                email: user.email,
-                profile_image: user.profileImage,
-                role: user.role,
-                email_verified: user.emailVerified,
-                created_at: user.createdAt,
-                status: 'active', // Default status for compatibility
-            })),
+            users: users.map(user => {
+                const isOnline = user.lastSeen && new Date(user.lastSeen) > fiveMinutesAgo;
+                return {
+                    id: user.id,
+                    username: user.username,
+                    email: user.email,
+                    profile_image: user.profileImage,
+                    role: user.role,
+                    email_verified: user.emailVerified,
+                    last_seen: user.lastSeen,
+                    created_at: user.createdAt,
+                    status: user.emailVerified ? 'active' : 'pending', // Account status based on email verification
+                    is_online: isOnline, // Online/offline status
+                };
+            }),
         });
     } catch (error: any) {
         console.error('Admin users fetch error:', error);

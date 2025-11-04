@@ -74,6 +74,12 @@ export async function POST(request: NextRequest) {
 
         await setAuthCookie(token);
 
+        // Update last seen timestamp
+        await prisma.user.update({
+            where: { id: user.id },
+            data: { lastSeen: new Date() },
+        });
+
         // Determine redirect URL based on role
         const redirectUrl =
             user.role === 'admin' ? '/admin/dashboard' : '/dashboard';
