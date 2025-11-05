@@ -55,7 +55,7 @@ export default function CreateAdminPage() {
         }
 
         if (password.length < 6) {
-            setError('Password must be at least 6 characters long');
+            setError('Password must be at least 6 characters longs');
             return;
         }
 
