@@ -26,6 +26,8 @@ export default function Home() {
     const params = new URLSearchParams(window.location.search);
     if (params.get('verified') === 'true') {
       setMessage({ type: 'success', text: 'Email verified successfully! You can now log in.' });
+    } else if (params.get('reset') === 'success') {
+      setMessage({ type: 'success', text: 'Password reset successfully! You can now sign in with your new password.' });
     } else if (params.get('error')) {
       const error = params.get('error');
       const errorMessages: Record<string, string> = {

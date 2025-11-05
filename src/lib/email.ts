@@ -175,3 +175,77 @@ export async function sendOTPEmail(
     return false;
   }
 }
+
+export async function sendPasswordResetEmail(
+  email: string,
+  username: string,
+  token: string
+): Promise<boolean> {
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+  const resetUrl = `${baseUrl}/reset-password?token=${token}`;
+
+  const mailOptions = {
+    from: `"${process.env.FROM_NAME || 'Smart Fish Care System'}" <${process.env.FROM_EMAIL || process.env.SMTP_USER}>`,
+    to: email,
+    subject: 'Reset Your Password - Smart Fish Care',
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background: linear-gradient(135deg, #7c5cff, #4cc9f0); color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0; }
+          .content { padding: 20px; background-color: #f9f9f9; }
+          .button { display: inline-block; padding: 12px 30px; background: linear-gradient(135deg, #7c5cff, #4cc9f0); color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; font-weight: bold; }
+          .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+          .warning { background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 10px; margin: 15px 0; }
+          .link-box { background-color: #fff; padding: 15px; border: 1px solid #ddd; border-radius: 5px; margin: 15px 0; word-break: break-all; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>🔐 Password Reset Request</h1>
+          </div>
+          <div class="content">
+            <p>Hello ${username},</p>
+            <p>We received a request to reset your password for your Smart Fish Care account.</p>
+            
+            <p>Click the button below to reset your password:</p>
+            <div style="text-align: center;">
+              <a href="${resetUrl}" class="button">Reset Password</a>
+            </div>
+            
+            <p>Or copy and paste this link into your browser:</p>
+            <div class="link-box">
+              <p style="margin: 0; color: #666;">${resetUrl}</p>
+            </div>
+            
+            <div class="warning">
+              <p style="margin: 0;"><strong>Security Notice:</strong> This link will expire in 1 hour. If you didn't request a password reset, please ignore this email or contact support if you have concerns.</p>
+            </div>
+            
+            <p>If you didn't request this password reset, you can safely ignore this email.</p>
+          </div>
+          <div class="footer">
+            <p>&copy; 2025 Smart Fish Care System. All rights reserved.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+  };
+
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    console.log('Password reset email sent successfully:', info.messageId);
+    return true;
+  } catch (error: any) {
+    console.error('Password reset email sending failed:', error);
+    if (error.code === 'EAUTH') {
+      console.error('Authentication failed. Please check your SMTP credentials.');
+    }
+    return false;
+  }
+}
