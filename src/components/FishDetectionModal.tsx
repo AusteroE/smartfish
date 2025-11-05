@@ -86,6 +86,7 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
   const currentDetectionsRef = useRef<Array<{ x: number; y: number; width: number; height: number; color: string; label: string; isTilapia?: boolean }>>([]); // Store current detections for drawing
   const lastSmsSentRef = useRef<number>(0); // Track last SMS send time for throttling
   const userPhoneRef = useRef<string | null>(null); // Store user phone number
+  const lastLargeFishSavedRef = useRef<number>(0); // Track last time a large fish was saved to history (10-second cooldown)
 
   // Initialize TensorFlow.js and load model
   useEffect(() => {
@@ -1158,18 +1159,31 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
                       category: firstDet.category,
                     };
 
-                    // Only save if this detection is different from the last one, or if it's been more than 5 seconds
-                    const shouldSave = !lastSavedDetectionRef.current ||
-                      lastSavedDetectionRef.current.length !== detectionKey.length ||
-                      lastSavedDetectionRef.current.width !== detectionKey.width ||
-                      lastSavedDetectionRef.current.category !== detectionKey.category ||
-                      (now - lastSavedDetectionRef.current.time) > 5000; // Save at least every 5 seconds
+                    // Check if this is a large fish and if cooldown has passed
+                    const isLargeFish = detectionKey.category === 'Large';
+                    const timeSinceLastLargeFish = now - lastLargeFishSavedRef.current;
+                    const largeFishCooldownPassed = timeSinceLastLargeFish >= 10000; // 10 seconds cooldown
+
+                    // For large fish: save if cooldown has passed (every 10 seconds)
+                    // For other fish: save if different from last saved or if it's been more than 5 seconds
+                    const shouldSave = isLargeFish
+                      ? largeFishCooldownPassed // For large fish, save if cooldown passed
+                      : (!lastSavedDetectionRef.current ||
+                        lastSavedDetectionRef.current.length !== detectionKey.length ||
+                        lastSavedDetectionRef.current.width !== detectionKey.width ||
+                        lastSavedDetectionRef.current.category !== detectionKey.category ||
+                        (now - lastSavedDetectionRef.current.time) > 5000); // Save at least every 5 seconds
 
                     if (shouldSave) {
                       lastSavedDetectionRef.current = {
                         ...detectionKey,
                         time: now,
                       };
+
+                      // Update large fish save time if this is a large fish
+                      if (isLargeFish) {
+                        lastLargeFishSavedRef.current = now;
+                      }
 
                       fetch('/api/fish-detection', {
                         method: 'POST',
@@ -1193,9 +1207,12 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
                         .then(data => {
                           if (data.success) {
                             console.log('Detection saved successfully');
+                            if (isLargeFish) {
+                              console.log('Large fish saved to history (10-second cooldown active)');
+                            }
 
                             // Send SMS notification for large fish (throttled to once per 2 minutes)
-                            if (detectionKey.category === 'Large') {
+                            if (isLargeFish) {
                               sendSmsNotification(detectionKey.category, detectionKey.length, detectionKey.width);
                             }
                           }
@@ -1205,6 +1222,10 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
                           // Reset last saved to allow retry on next detection
                           if (err.message?.includes('401') || err.message?.includes('Unauthorized')) {
                             console.warn('Authentication failed - user may need to log in again');
+                          }
+                          // If save failed for large fish, don't update the cooldown timer
+                          if (isLargeFish) {
+                            lastLargeFishSavedRef.current = Math.max(0, lastLargeFishSavedRef.current - 10000); // Allow retry sooner
                           }
                         });
                     }
@@ -1384,16 +1405,12 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
               autoPlay
               playsInline
               muted
-              className="absolute opacity-0 pointer-events-none w-[640px] h-[480px] top-0 left-0 -z-10"
-              style={{ display: 'block' }}
+              className="absolute opacity-0 pointer-events-none w-[640px] h-[480px] top-0 left-0 -z-10 block"
             />
             <canvas
               ref={canvasRef}
-              className="w-full h-auto max-h-[220px] sm:max-h-[280px] md:max-h-[260px] object-contain bg-black block relative z-10"
-              style={{
-                imageRendering: 'auto',
-                display: detectionActive ? 'block' : 'none'
-              }}
+              className={`w-full h-auto max-h-[220px] sm:max-h-[280px] md:max-h-[260px] object-contain bg-black relative z-10 ${detectionActive ? 'block' : 'hidden'}`}
+              style={{ imageRendering: 'auto' }}
             />
             {!detectionActive && (
               <div className="text-[#888] text-center p-2 sm:p-3 md:p-4">

@@ -246,7 +246,7 @@ export default function CreateAdminPage() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-purple-500 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-purple-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="flex-1 px-6 py-3 bg-linear-to-r from-purple-600 to-purple-500 text-white rounded-lg font-semibold hover:from-purple-700 hover:to-purple-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             {loading ? (
                                 <span>

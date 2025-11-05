@@ -55,7 +55,7 @@ function VerifyOTPContent() {
         <p className="mb-8 text-[#a2a8b6]">Please enter the 6-digit code sent to your email address.</p>
 
         {error && (
-          <div className="my-5 rounded-xl border border-red-300/30 bg-gradient-to-r from-red-500/10 to-red-500/5 px-5 py-4 font-medium text-red-500 shadow-[0_4px_15px_rgba(239,68,68,0.1)]">
+          <div className="my-5 rounded-xl border border-red-300/30 bg-linear-to-r from-red-500/10 to-red-500/5 px-5 py-4 font-medium text-red-500 shadow-[0_4px_15px_rgba(239,68,68,0.1)]">
             {error}
           </div>
         )}
@@ -80,7 +80,7 @@ function VerifyOTPContent() {
           <br />
           <button
             type="submit"
-            className="inline-block rounded-[15px] border-none bg-gradient-to-r from-[#7c5cff] to-[#4cc9f0] px-9 py-4 text-base font-semibold text-white shadow-[0_4px_15px_rgba(124,92,255,0.3)] transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_25px_rgba(124,92,255,0.4)] disabled:cursor-not-allowed disabled:opacity-60"
+            className="inline-block rounded-[15px] border-none bg-linear-to-r from-[#7c5cff] to-[#4cc9f0] px-9 py-4 text-base font-semibold text-white shadow-[0_4px_15px_rgba(124,92,255,0.3)] transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_25px_rgba(124,92,255,0.4)] disabled:cursor-not-allowed disabled:opacity-60"
             disabled={loading}
           >
             {loading ? 'Verifying...' : 'Verify OTP'}

@@ -122,18 +122,18 @@ export default function StockingPage() {
             <i className="fa-solid fa-comment absolute left-2.5 sm:left-3 text-[#a2a8b6] text-sm sm:text-base"></i>
             <input type="text" name="notes" id="notes" placeholder="Notes" className="w-full bg-transparent border-none text-[#e6e9ef] text-sm sm:text-base outline-none pl-8 sm:pl-10 pr-2 sm:pr-3" />
           </div>
-          <button type="button" onClick={addStocking} className="bg-gradient-to-r from-[#7c5cff] to-[#4cc9f0] text-white border-none px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl text-sm sm:text-base font-semibold cursor-pointer transition-all hover:translate-y-[-2px] hover:shadow-[0_4px_15px_rgba(124,92,255,0.4)] w-full sm:w-auto">Add</button>
+          <button type="button" onClick={addStocking} className="bg-linear-to-r from-[#7c5cff] to-[#4cc9f0] text-white border-none px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl text-sm sm:text-base font-semibold cursor-pointer transition-all hover:translate-y-[-2px] hover:shadow-[0_4px_15px_rgba(124,92,255,0.4)] w-full sm:w-auto">Add</button>
         </form>
-        <div className="overflow-x-auto mt-3 sm:mt-4 -mx-3 px-3 sm:mx-0 sm:px-0" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div className="overflow-x-auto mt-3 sm:mt-4 -mx-3 px-3 sm:mx-0 sm:px-0 overscroll-x-contain">
           <div className="inline-block min-w-full align-middle">
-            <table className="w-full border-collapse text-xs sm:text-sm min-w-[600px] md:min-w-full" style={{ tableLayout: 'fixed' }}>
+            <table className="w-full border-collapse text-xs sm:text-sm min-w-[600px] md:min-w-full table-fixed">
               <thead>
                 <tr>
-                  <th className="text-center p-2 sm:p-3 bg-white/5 font-semibold text-white/90" style={{ width: '22%' }}>Fish Type</th>
-                  <th className="text-center p-2 sm:p-3 bg-white/5 font-semibold text-white/90" style={{ width: '18%' }}>Stock Date</th>
-                  <th className="text-center p-2 sm:p-3 bg-white/5 font-semibold text-white/90" style={{ width: '18%' }}>Aquarium #</th>
-                  <th className="text-center p-2 sm:p-3 bg-white/5 font-semibold text-white/90" style={{ width: '12%' }}>Quantity</th>
-                  <th className="text-center p-2 sm:p-3 bg-white/5 font-semibold text-white/90" style={{ width: '30%' }}>Action</th>
+                  <th className="text-center p-2 sm:p-3 bg-white/5 font-semibold text-white/90 w-[22%]">Fish Type</th>
+                  <th className="text-center p-2 sm:p-3 bg-white/5 font-semibold text-white/90 w-[18%]">Stock Date</th>
+                  <th className="text-center p-2 sm:p-3 bg-white/5 font-semibold text-white/90 w-[18%]">Aquarium #</th>
+                  <th className="text-center p-2 sm:p-3 bg-white/5 font-semibold text-white/90 w-[12%]">Quantity</th>
+                  <th className="text-center p-2 sm:p-3 bg-white/5 font-semibold text-white/90 w-[30%]">Action</th>
                 </tr>
               </thead>
               <tbody className="border-t border-white/12">

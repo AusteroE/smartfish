@@ -3,42 +3,40 @@ import { verifyAuth } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 
 export async function GET(request: NextRequest) {
-  try {
-    const userId = await verifyAuth(request);
-    if (!userId) {
-      return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
-    }
+    try {
+        const userId = await verifyAuth(request);
+        if (!userId) {
+            return NextResponse.json({ success: false, message: 'Unauthorized' }, { status: 401 });
+        }
 
-    // Get user data
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { username: true, email: true },
-    });
+        // Get user data
+        const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { username: true, email: true },
+        });
 
-    if (!user) {
-      return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 });
-    }
+        if (!user) {
+            return NextResponse.json({ success: false, message: 'User not found' }, { status: 404 });
+        }
 
-    // Fetch all records data
-    const [fishRanges, waterParams, stockingRecords, harvestRecords, feedingRecords] = await Promise.all([
-      prisma.fishSizeRange.findMany({ orderBy: { minLength: 'asc' } }),
-      prisma.waterParameter.findMany({ orderBy: { parameterName: 'asc' } }),
-      prisma.stockingRecord.findMany({ where: { userId }, orderBy: { stockDate: 'desc' } }),
-      prisma.harvestRecord.findMany({ where: { userId }, orderBy: { harvestDate: 'desc' } }),
-      prisma.feedingRecord.findMany({ where: { userId }, orderBy: { feedingTime: 'asc' } }),
-    ]);
+        // Fetch all records data
+        const [stockingRecords, harvestRecords, feedingRecords] = await Promise.all([
+            prisma.stockingRecord.findMany({ where: { userId }, orderBy: { stockDate: 'desc' } }),
+            prisma.harvestRecord.findMany({ where: { userId }, orderBy: { harvestDate: 'desc' } }),
+            prisma.feedingRecord.findMany({ where: { userId }, orderBy: { feedingTime: 'asc' } }),
+        ]);
 
-    const timestamp = new Date().toLocaleString('en-US', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    });
+        const timestamp = new Date().toLocaleString('en-US', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+        });
 
-    // Generate HTML report matching PHP version
-    const htmlContent = `<!DOCTYPE html>
+        // Generate HTML report matching PHP version
+        const htmlContent = `<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -131,20 +129,6 @@ export async function GET(request: NextRequest) {
             font-style: italic;
             padding: 20px;
         }
-        .fish-ranges-table th:nth-child(1),
-        .fish-ranges-table td:nth-child(1) { width: 20%; }
-        .fish-ranges-table th:nth-child(2),
-        .fish-ranges-table td:nth-child(2) { width: 40%; }
-        .fish-ranges-table th:nth-child(3),
-        .fish-ranges-table td:nth-child(3) { width: 40%; }
-        .water-params-table th:nth-child(1),
-        .water-params-table td:nth-child(1) { width: 25%; }
-        .water-params-table th:nth-child(2),
-        .water-params-table td:nth-child(2) { width: 25%; }
-        .water-params-table th:nth-child(3),
-        .water-params-table td:nth-child(3) { width: 25%; }
-        .water-params-table th:nth-child(4),
-        .water-params-table td:nth-child(4) { width: 25%; }
         .stocking-table th:nth-child(1),
         .stocking-table td:nth-child(1) { width: 25%; }
         .stocking-table th:nth-child(2),
@@ -201,57 +185,6 @@ export async function GET(request: NextRequest) {
                 <img src="${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/frontend/img/print_logo.jpg" alt="USTP Logo" class="logo-right-img" onerror="this.style.display='none'">
             </div>
         </div>
-    </div>
-    
-    <div class="section">
-        <div class="section-title">Fish Size Ranges</div>
-        <table class="fish-ranges-table">
-            <thead>
-                <tr>
-                    <th>Category</th>
-                    <th>Length (cm)</th>
-                    <th>Width (cm)</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${fishRanges.length > 0 ? fishRanges.map(range => `
-                    <tr>
-                        <td>${escapeHtml(range.category)}</td>
-                        <td>${Number(range.minLength)}${range.maxLength ? ' - ' + Number(range.maxLength) : '+'}</td>
-                        <td>${Number(range.minWidth)}${range.maxWidth ? ' - ' + Number(range.maxWidth) : '+'}</td>
-                    </tr>
-                `).join('') : '<tr><td colspan="3" class="no-data">No fish size ranges found.</td></tr>'}
-            </tbody>
-        </table>
-    </div>
-    
-    <div class="section">
-        <div class="section-title">Water Parameters</div>
-        <table class="water-params-table">
-            <thead>
-                <tr>
-                    <th>Parameter</th>
-                    <th>Normal Range</th>
-                    <th>Danger Range</th>
-                    <th>Unit</th>
-                </tr>
-            </thead>
-            <tbody>
-                ${waterParams.length > 0 ? waterParams.map(param => {
-      const dangerRange = (param.dangerMin !== null && param.dangerMax !== null)
-        ? `${Number(param.dangerMin)} - ${Number(param.dangerMax)}`
-        : 'N/A';
-      return `
-                        <tr>
-                            <td>${escapeHtml(param.parameterName)}</td>
-                            <td>${Number(param.normalMin)} - ${Number(param.normalMax)}</td>
-                            <td>${dangerRange}</td>
-                            <td>${escapeHtml(param.unit)}</td>
-                        </tr>
-                    `;
-    }).join('') : '<tr><td colspan="4" class="no-data">No water parameters found.</td></tr>'}
-            </tbody>
-        </table>
     </div>
     
     <div class="section">
@@ -355,29 +288,29 @@ export async function GET(request: NextRequest) {
 </body>
 </html>`;
 
-    // Return HTML content that opens in new window and auto-prints
-    return new NextResponse(htmlContent, {
-      headers: {
-        'Content-Type': 'text/html; charset=utf-8',
-        'Content-Disposition': 'inline; filename="fish-care-report.html"',
-      },
-    });
-  } catch (error: any) {
-    console.error('PDF export error:', error);
-    return NextResponse.json(
-      { success: false, message: 'Error generating PDF: ' + error.message },
-      { status: 500 }
-    );
-  }
+        // Return HTML content that opens in new window and auto-prints
+        return new NextResponse(htmlContent, {
+            headers: {
+                'Content-Type': 'text/html; charset=utf-8',
+                'Content-Disposition': 'inline; filename="fish-care-report.html"',
+            },
+        });
+    } catch (error: any) {
+        console.error('PDF export error:', error);
+        return NextResponse.json(
+            { success: false, message: 'Error generating PDF: ' + error.message },
+            { status: 500 }
+        );
+    }
 }
 
 function escapeHtml(text: string | null | undefined): string {
-  if (!text) return '';
-  return String(text)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
+    if (!text) return '';
+    return String(text)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
 }
 

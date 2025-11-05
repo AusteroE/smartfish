@@ -78,14 +78,14 @@ export default function Sidebar({ user, onSettingsClick, isMobileOpen = false, o
             {/* Sidebar - Hidden on mobile, shown on desktop */}
             <aside className={`
                 hidden md:block
-                fixed top-0 left-0 h-screen w-[280px] bg-gradient-to-b from-[#121830] to-[#0d1220] border-r border-white/8 overflow-y-auto overflow-x-hidden z-[1000] px-5 py-6 md:py-8
+                fixed top-0 left-0 h-screen w-[280px] bg-linear-to-b from-[#121830] to-[#0d1220] border-r border-white/8 overflow-y-auto overflow-x-hidden z-[1000] px-5 py-6 md:py-8
                 shadow-[4px_0_20px_rgba(0,0,0,0.3)]
             `}>
 
                 {/* Sidebar Header */}
                 <div className="mb-8 md:mb-10 mt-0 md:mt-0">
                     <div className="flex justify-center mb-4 md:mb-5">
-                        <div className="w-[80px] h-[80px] md:w-[100px] md:h-[100px] rounded-full overflow-hidden border-[3px] border-white/10 flex-shrink-0">
+                        <div className="w-[80px] h-[80px] md:w-[100px] md:h-[100px] rounded-full overflow-hidden border-[3px] border-white/10 shrink-0">
                             <Image
                                 src={getProfileImageSrc()}
                                 alt="Profile Picture"
@@ -101,7 +101,7 @@ export default function Sidebar({ user, onSettingsClick, isMobileOpen = false, o
                     <h2 className="text-base md:text-lg font-bold text-center text-[#e6e9ef] px-2 mb-2">
                         Welcome,
                     </h2>
-                    <p className="text-sm md:text-base font-semibold text-center text-[#7c5cff] px-2 mb-2 break-words">
+                    <p className="text-sm md:text-base font-semibold text-center text-[#7c5cff] px-2 mb-2 wrap-break-word">
                         {user.username}
                     </p>
                     <p className="text-xs text-center text-[#a2a8b6] mt-1 px-2 break-all leading-relaxed">
@@ -128,7 +128,7 @@ export default function Sidebar({ user, onSettingsClick, isMobileOpen = false, o
                                             : 'text-[#e6e9ef] hover:bg-[#7c5cff]/20 hover:border hover:border-[#7c5cff]/35'
                                             }`}
                                     >
-                                        <i className={`fas ${item.icon} mr-3 w-4 text-base flex-shrink-0`}></i>
+                                        <i className={`fas ${item.icon} mr-3 w-4 text-base shrink-0`}></i>
                                         <span className="truncate">{item.label}</span>
                                     </Link>
                                 </li>
@@ -147,7 +147,7 @@ export default function Sidebar({ user, onSettingsClick, isMobileOpen = false, o
                                     : 'text-[#e6e9ef] hover:bg-[#7c5cff]/20 hover:border hover:border-[#7c5cff]/35'
                                     }`}
                             >
-                                <i className="fas fa-cog mr-3 w-4 text-base flex-shrink-0"></i>
+                                <i className="fas fa-cog mr-3 w-4 text-base shrink-0"></i>
                                 <span className="truncate">Settings</span>
                             </Link>
                         </li>
@@ -160,7 +160,7 @@ export default function Sidebar({ user, onSettingsClick, isMobileOpen = false, o
                                 }}
                                 className={`flex items-center px-4 py-3 rounded-xl transition-all duration-300 font-medium text-sm text-red-400 hover:bg-red-500/20 hover:border hover:border-red-500/35 whitespace-nowrap ${logoutLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
                             >
-                                <i className={`fas ${logoutLoading ? 'fa-spinner fa-spin' : 'fa-sign-out-alt'} mr-3 w-4 text-base flex-shrink-0`}></i>
+                                <i className={`fas ${logoutLoading ? 'fa-spinner fa-spin' : 'fa-sign-out-alt'} mr-3 w-4 text-base shrink-0`}></i>
                                 <span className="truncate">{logoutLoading ? 'Logging out...' : 'Logout'}</span>
                             </a>
                         </li>

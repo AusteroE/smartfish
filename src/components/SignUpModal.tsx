@@ -233,7 +233,7 @@ export default function SignUpModal({ isOpen, onClose, onShowTerms, router }: Si
           <button
             type="submit"
             disabled={loading}
-            className="w-full rounded-lg sm:rounded-[10px] border-none bg-gradient-to-r from-[#7c5cff] to-[#4cc9f0] px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base font-semibold text-white transition-all hover:translate-y-[-2px] hover:shadow-[0_8px_25px_rgba(124,92,255,0.4)] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:shadow-none"
+            className="w-full rounded-lg sm:rounded-[10px] border-none bg-linear-to-r from-[#7c5cff] to-[#4cc9f0] px-3 sm:px-4 py-2.5 sm:py-3 text-sm sm:text-base font-semibold text-white transition-all hover:translate-y-[-2px] hover:shadow-[0_8px_25px_rgba(124,92,255,0.4)] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0 disabled:hover:shadow-none"
           >
             {loading ? 'Creating Account...' : 'Sign Up'}
           </button>

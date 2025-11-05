@@ -57,10 +57,7 @@ export default function Home() {
 
   return (
     <>
-      <style jsx global>{`
-        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css');
-      `}</style>
-      <div className="min-h-screen flex items-center justify-center bg-[radial-gradient(1200px_600px_at_20%_-10%,rgba(124,92,255,0.18),transparent),radial-gradient(900px_500px_at_100%_10%,rgba(76,201,240,0.15),transparent),#0b1020] p-4 sm:p-5 font-['Inter',system-ui,-apple-system,sans-serif] text-[#e6e9ef] relative overflow-hidden" style={{ backgroundColor: '#0b1020' }}>
+      <div className="min-h-screen flex items-center justify-center bg-[radial-gradient(1200px_600px_at_20%_-10%,rgba(124,92,255,0.18),transparent),radial-gradient(900px_500px_at_100%_10%,rgba(76,201,240,0.15),transparent),#0b1020] p-4 sm:p-5 text-[#e6e9ef] relative overflow-hidden">
         {/* Animated Fish Background - Client-side only to avoid hydration mismatch */}
         {mounted && (
           <div className="fish-container">
@@ -182,7 +179,7 @@ export default function Home() {
         )}
         {message && (
           <div
-            className={`fixed top-5 right-5 z-[10000] rounded-lg border px-5 py-4 ${message.type === 'success'
+            className={`fixed top-5 right-5 z-10000 rounded-lg border px-5 py-4 ${message.type === 'success'
               ? 'border-[#c3e6cb] bg-[#d4edda] text-[#155724]'
               : 'border-[#f5c6cb] bg-[#f8d7da] text-[#721c24]'
               }`}
@@ -211,7 +208,7 @@ export default function Home() {
 
           <h1 className="mb-4 sm:mb-5 text-3xl sm:text-4xl md:text-[3.5rem] font-bold leading-tight px-4">
             Get Smart Care <br />
-            <span className="bg-gradient-to-r from-[#7c5cff] to-[#4cc9f0] bg-clip-text text-transparent">
+            <span className="bg-linear-to-r from-[#7c5cff] to-[#4cc9f0] bg-clip-text text-transparent">
               For Fish
             </span>
           </h1>
@@ -226,7 +223,7 @@ export default function Home() {
             <button
               id="signInBtn"
               onClick={() => setSignInOpen(true)}
-              className="group relative overflow-hidden rounded-[50px] border-none bg-gradient-to-r from-[#7c5cff] to-[#4cc9f0] px-8 sm:px-10 py-3 sm:py-4 text-sm sm:text-base font-semibold uppercase tracking-wide text-white transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_25px_rgba(124,92,255,0.4)] w-full sm:w-auto"
+              className="group relative overflow-hidden rounded-[50px] border-none bg-linear-to-r from-[#7c5cff] to-[#4cc9f0] px-8 sm:px-10 py-3 sm:py-4 text-sm sm:text-base font-semibold uppercase tracking-wide text-white transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_25px_rgba(124,92,255,0.4)] w-full sm:w-auto"
             >
               <div className="absolute left-0 top-0 h-full w-1/2 -translate-x-full bg-white/10 transition-transform duration-300 group-hover:translate-x-0"></div>
               <span className="relative z-10">Sign In</span>
@@ -236,7 +233,7 @@ export default function Home() {
             <button
               id="signUpBtn"
               onClick={() => setSignUpOpen(true)}
-              className="group relative overflow-hidden rounded-[50px] border-none bg-gradient-to-r from-[#7c5cff] to-[#4cc9f0] px-8 sm:px-10 py-3 sm:py-4 text-sm sm:text-base font-semibold uppercase tracking-wide text-white transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_25px_rgba(124,92,255,0.4)] w-full sm:w-auto"
+              className="group relative overflow-hidden rounded-[50px] border-none bg-linear-to-r from-[#7c5cff] to-[#4cc9f0] px-8 sm:px-10 py-3 sm:py-4 text-sm sm:text-base font-semibold uppercase tracking-wide text-white transition-all hover:-translate-y-0.5 hover:shadow-[0_8px_25px_rgba(124,92,255,0.4)] w-full sm:w-auto"
             >
               <div className="absolute left-0 top-0 h-full w-1/2 -translate-x-full bg-white/10 transition-transform duration-300 group-hover:translate-x-0"></div>
               <span className="relative z-10">Sign Up</span>

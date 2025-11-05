@@ -71,8 +71,8 @@ function ResetPasswordForm() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-[#0b1020] via-[#0b1020] to-[#0b1020] flex items-center justify-center p-4">
-            <div className="w-full max-w-[400px] rounded-2xl border border-white/12 bg-gradient-to-b from-white/5 to-white/2 p-5 sm:p-8 text-[#e6e9ef] backdrop-blur-md">
+        <div className="min-h-screen bg-linear-to-br from-[#0b1020] via-[#0b1020] to-[#0b1020] flex items-center justify-center p-4">
+            <div className="w-full max-w-[400px] rounded-2xl border border-white/12 bg-linear-to-b from-white/5 to-white/2 p-5 sm:p-8 text-[#e6e9ef] backdrop-blur-md">
                 <div className="text-center mb-6">
                     <h1 className="text-2xl sm:text-3xl font-bold mb-2 text-[#e6e9ef]">Reset Password</h1>
                     <p className="text-sm text-[#a2a8b6]">Enter your new password below</p>
@@ -132,7 +132,7 @@ function ResetPasswordForm() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full rounded-[10px] border-none bg-gradient-to-r from-[#7c5cff] to-[#4cc9f0] px-3 py-3 text-base font-semibold text-white transition-all hover:translate-y-[-2px] hover:shadow-[0_8px_25px_rgba(124,92,255,0.4)] disabled:cursor-not-allowed disabled:opacity-60"
+                            className="w-full rounded-[10px] border-none bg-linear-to-r from-[#7c5cff] to-[#4cc9f0] px-3 py-3 text-base font-semibold text-white transition-all hover:translate-y-[-2px] hover:shadow-[0_8px_25px_rgba(124,92,255,0.4)] disabled:cursor-not-allowed disabled:opacity-60"
                         >
                             {loading ? 'Resetting Password...' : 'Reset Password'}
                         </button>
@@ -167,8 +167,8 @@ function ResetPasswordForm() {
 export default function ResetPasswordPage() {
     return (
         <Suspense fallback={
-            <div className="min-h-screen bg-gradient-to-br from-[#0b1020] via-[#0b1020] to-[#0b1020] flex items-center justify-center p-4">
-                <div className="w-full max-w-[400px] rounded-2xl border border-white/12 bg-gradient-to-b from-white/5 to-white/2 p-5 sm:p-8 text-[#e6e9ef] backdrop-blur-md">
+            <div className="min-h-screen bg-linear-to-br from-[#0b1020] via-[#0b1020] to-[#0b1020] flex items-center justify-center p-4">
+                <div className="w-full max-w-[400px] rounded-2xl border border-white/12 bg-linear-to-b from-white/5 to-white/2 p-5 sm:p-8 text-[#e6e9ef] backdrop-blur-md">
                     <div className="text-center">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#7c5cff] mx-auto mb-4"></div>
                         <p className="text-[#a2a8b6]">Loading...</p>

@@ -106,11 +106,11 @@ export default function SignInModal({ isOpen, onClose, router }: SignInModalProp
 
   return (
     <div
-      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50"
+      className="fixed inset-0 z-1000 flex items-center justify-center bg-black/50"
       onClick={onClose}
     >
       <div
-        className="relative w-[90%] max-w-[400px] rounded-2xl border border-white/12 bg-gradient-to-b from-white/5 to-white/2 p-5 sm:p-8 text-[#e6e9ef] backdrop-blur-md max-h-[90vh] overflow-y-auto"
+        className="relative w-[90%] max-w-[400px] rounded-2xl border border-white/12 bg-linear-to-b from-white/5 to-white/2 p-5 sm:p-8 text-[#e6e9ef] backdrop-blur-md max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <span
@@ -178,7 +178,7 @@ export default function SignInModal({ isOpen, onClose, router }: SignInModalProp
             <button
               type="submit"
               disabled={loading}
-              className="w-full rounded-[10px] border-none bg-gradient-to-r from-[#7c5cff] to-[#4cc9f0] px-3 py-3 text-base font-semibold text-white transition-all hover:translate-y-[-2px] hover:shadow-[0_8px_25px_rgba(124,92,255,0.4)] disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-[10px] border-none bg-linear-to-r from-[#7c5cff] to-[#4cc9f0] px-3 py-3 text-base font-semibold text-white transition-all hover:translate-y-[-2px] hover:shadow-[0_8px_25px_rgba(124,92,255,0.4)] disabled:cursor-not-allowed disabled:opacity-60"
             >
               {loading ? 'Signing In...' : 'Sign In'}
             </button>
@@ -218,7 +218,7 @@ export default function SignInModal({ isOpen, onClose, router }: SignInModalProp
               <button
                 type="submit"
                 disabled={forgotPasswordLoading}
-                className="flex-1 rounded-[10px] border-none bg-gradient-to-r from-[#7c5cff] to-[#4cc9f0] px-3 py-3 text-base font-semibold text-white transition-all hover:translate-y-[-2px] hover:shadow-[0_8px_25px_rgba(124,92,255,0.4)] disabled:cursor-not-allowed disabled:opacity-60"
+                className="flex-1 rounded-[10px] border-none bg-linear-to-r from-[#7c5cff] to-[#4cc9f0] px-3 py-3 text-base font-semibold text-white transition-all hover:translate-y-[-2px] hover:shadow-[0_8px_25px_rgba(124,92,255,0.4)] disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {forgotPasswordLoading ? 'Sending...' : 'Send Reset Link'}
               </button>

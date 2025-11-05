@@ -171,7 +171,7 @@ export default function TermsModal({ isOpen, onClose }: TermsModalProps) {
                     id="acceptTermsBtn"
                     disabled={!scrolledToEnd}
                     onClick={onClose}
-                    className="w-full rounded-[10px] border-none bg-gradient-to-r from-[#7c5cff] to-[#4cc9f0] px-4 py-4 text-base font-semibold text-white transition-all hover:translate-y-[-2px] hover:shadow-[0_8px_25px_rgba(124,92,255,0.4)] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="w-full rounded-[10px] border-none bg-linear-to-r from-[#7c5cff] to-[#4cc9f0] px-4 py-4 text-base font-semibold text-white transition-all hover:translate-y-[-2px] hover:shadow-[0_8px_25px_rgba(124,92,255,0.4)] disabled:cursor-not-allowed disabled:opacity-50"
                 >
                     I Agree
                 </button>

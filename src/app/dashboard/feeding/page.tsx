@@ -126,18 +126,18 @@ export default function FeedingPage() {
               <option value="Large">Large</option>
             </select>
           </div>
-          <button type="button" onClick={addFeed} className="bg-gradient-to-r from-[#7c5cff] to-[#4cc9f0] text-white border-none px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl text-sm sm:text-base font-semibold cursor-pointer transition-all hover:translate-y-[-2px] hover:shadow-[0_4px_15px_rgba(124,92,255,0.4)] w-full sm:w-auto">Set</button>
+          <button type="button" onClick={addFeed} className="bg-linear-to-r from-[#7c5cff] to-[#4cc9f0] text-white border-none px-4 sm:px-6 py-2.5 sm:py-3 rounded-xl text-sm sm:text-base font-semibold cursor-pointer transition-all hover:translate-y-[-2px] hover:shadow-[0_4px_15px_rgba(124,92,255,0.4)] w-full sm:w-auto">Set</button>
         </form>
-        <div className="overflow-x-auto mt-3 sm:mt-4 -mx-3 px-3 sm:mx-0 sm:px-0" style={{ WebkitOverflowScrolling: 'touch' }}>
+        <div className="overflow-x-auto mt-3 sm:mt-4 -mx-3 px-3 sm:mx-0 sm:px-0 overscroll-x-contain">
           <div className="inline-block min-w-full align-middle">
-            <table className="w-full border-collapse text-xs sm:text-sm min-w-[550px] md:min-w-full" style={{ tableLayout: 'fixed' }}>
+            <table className="w-full border-collapse text-xs sm:text-sm min-w-[550px] md:min-w-full table-fixed">
               <thead>
                 <tr>
-                  <th className="text-center p-2 sm:p-3 bg-white/5 font-semibold text-white/90" style={{ width: '15%' }}>Size</th>
-                  <th className="text-center p-2 sm:p-3 bg-white/5 font-semibold text-white/90" style={{ width: '25%' }}>Food</th>
-                  <th className="text-center p-2 sm:p-3 bg-white/5 font-semibold text-white/90" style={{ width: '20%' }}>Time</th>
-                  <th className="text-center p-2 sm:p-3 bg-white/5 font-semibold text-white/90" style={{ width: '20%' }}>Quantity</th>
-                  <th className="text-center p-2 sm:p-3 bg-white/5 font-semibold text-white/90" style={{ width: '20%' }}>Action</th>
+                  <th className="text-center p-2 sm:p-3 bg-white/5 font-semibold text-white/90 w-[15%]">Size</th>
+                  <th className="text-center p-2 sm:p-3 bg-white/5 font-semibold text-white/90 w-[25%]">Food</th>
+                  <th className="text-center p-2 sm:p-3 bg-white/5 font-semibold text-white/90 w-[20%]">Time</th>
+                  <th className="text-center p-2 sm:p-3 bg-white/5 font-semibold text-white/90 w-[20%]">Quantity</th>
+                  <th className="text-center p-2 sm:p-3 bg-white/5 font-semibold text-white/90 w-[20%]">Action</th>
                 </tr>
               </thead>
               <tbody className="border-t border-white/12">

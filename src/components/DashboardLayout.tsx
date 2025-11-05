@@ -96,7 +96,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     if (!user) return null;
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-[#0b1020] via-[#0b1020] to-[#0b1020] overflow-x-hidden">
+        <div className="min-h-screen bg-linear-to-br from-[#0b1020] via-[#0b1020] to-[#0b1020] overflow-x-hidden">
 
             {/* Fixed Sidebar - Desktop only */}
             <Sidebar
@@ -107,8 +107,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             />
 
             {/* Main Content */}
-            <main className="flex-1 p-4 sm:p-6 md:p-10 md:pl-[280px] bg-transparent min-h-screen pb-32 md:pb-10">
-                <div className={`${pathname?.startsWith('/admin') ? 'w-full' : 'max-w-7xl mx-auto'}`}>
+            <main className={`flex-1 md:ml-[280px] bg-transparent min-h-screen pb-32 md:pb-10 ${pathname?.startsWith('/admin') ? 'pt-4 sm:pt-6 md:pt-8 lg:pt-10 pr-4 sm:pr-6 md:pr-8 lg:pr-10 pb-4 sm:pb-6 md:pb-8 lg:pb-10' : 'p-4 sm:p-6 md:p-8 lg:p-10'}`}>
+                <div className={`${pathname?.startsWith('/admin') ? 'w-full pl-4 sm:pl-6 md:pl-8 lg:pl-10' : 'max-w-7xl mx-auto'}`}>
                     {children}
                 </div>
             </main>
@@ -118,7 +118,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
             {/* Mobile Bottom Navigation */}
             {user && (
-                <nav className="md:hidden fixed bottom-0 left-0 right-0 w-full bg-gradient-to-t from-[#121830]/95 to-[#0d1220]/95 backdrop-blur-[20px] shadow-[0_-8px_32px_rgba(0,0,0,0.4)] border-t border-white/8 flex justify-around items-center px-2 pt-3 pb-4 z-[1000]" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+                <nav className="md:hidden fixed bottom-0 left-0 right-0 w-full bg-linear-to-t from-[#121830]/95 to-[#0d1220]/95 backdrop-blur-[20px] shadow-[0_-8px_32px_rgba(0,0,0,0.4)] border-t border-white/8 flex justify-around items-center px-2 pt-3 safe-area-inset-bottom z-1000">
                     {getNavItems(user.role === 'admin', pathname?.startsWith('/admin') || false).map((item) => {
                         const isActive = pathname === item.href;
                         return (
@@ -142,25 +142,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                 </nav>
             )}
 
-            <style jsx global>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
-        @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css');
-
-        body {
-          font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-          background: radial-gradient(1200px 600px at 20% -10%, rgba(124, 92, 255, 0.18), transparent),
-                     radial-gradient(900px 500px at 100% 10%, rgba(76, 201, 240, 0.15), transparent),
-                     #0b1020 !important;
-          color: #e6e9ef !important;
-        }
-
-        @media (max-width: 768px) {
-          main {
-            margin-left: 0 !important;
-            padding: 20px !important;
-          }
-        }
-      `}</style>
         </div>
     );
 }
