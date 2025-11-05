@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import bcrypt from 'bcryptjs';
 import { generateVerificationToken, generateOTP, sendVerificationEmail } from '@/lib/email';
-import fs from 'fs/promises';
-import path from 'path';
+import { uploadProfileImage } from '@/lib/upload-server';
 
 export async function POST(request: NextRequest) {
     try {
@@ -48,35 +47,14 @@ export async function POST(request: NextRequest) {
         // Handle profile image upload
         let profileImage = 'frontend/img/default profile.png';
         if (profileFile && profileFile.size > 0) {
-            const allowedTypes = ['image/jpeg', 'image/png', 'image/gif'];
-            if (!allowedTypes.includes(profileFile.type)) {
+            try {
+                profileImage = await uploadProfileImage(profileFile);
+            } catch (error: any) {
                 return NextResponse.json(
-                    { success: false, error: 'Invalid file type. Only JPEG, PNG, and GIF are allowed.' },
+                    { success: false, error: error.message || 'Failed to upload profile image' },
                     { status: 400 }
                 );
             }
-
-            if (profileFile.size > 10 * 1024 * 1024) {
-                return NextResponse.json(
-                    { success: false, error: 'File size is too large. Maximum allowed size is 10MB.' },
-                    { status: 400 }
-                );
-            }
-
-            // Generate unique filename
-            const timestamp = Date.now();
-            const extension = profileFile.name.split('.').pop();
-            const filename = `profile_${timestamp}.${extension}`;
-
-            // In Next.js, we'll save to public/uploads/profile_images
-            profileImage = `uploads/profile_images/${filename}`;
-
-            // Save file (in production, use proper file storage)
-            const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'profile_images');
-            await fs.mkdir(uploadDir, { recursive: true });
-            const filePath = path.join(uploadDir, filename);
-            const bytes = await profileFile.arrayBuffer();
-            await fs.writeFile(filePath, Buffer.from(bytes));
         }
 
         // Generate verification token and OTP

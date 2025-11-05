@@ -59,6 +59,16 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [fullscreen, setFullscreen] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [detectionHistory, setDetectionHistory] = useState<Array<{
+    id: number;
+    detectedLength: number;
+    detectedWidth: number;
+    sizeCategory: string;
+    confidenceScore: number | null;
+    detectionTimestamp: string;
+  }>>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -71,13 +81,18 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
   const detectionHistoryRef = useRef<Array<{ x: number; y: number; time: number }>>([]); // Track detection positions
   const frameSkipCounterRef = useRef(0); // Skip frames for performance
   const processingCanvasRef = useRef<HTMLCanvasElement | null>(null); // Offscreen canvas for processing
+  const lastSavedDetectionRef = useRef<{ length: number; width: number; category: string; time: number } | null>(null); // Track last saved detection to prevent duplicates
   const lastDetectionTimeRef = useRef<number>(0); // Throttle detections
   const currentDetectionsRef = useRef<Array<{ x: number; y: number; width: number; height: number; color: string; label: string; isTilapia?: boolean }>>([]); // Store current detections for drawing
+  const lastSmsSentRef = useRef<number>(0); // Track last SMS send time for throttling
+  const userPhoneRef = useRef<string | null>(null); // Store user phone number
 
   // Initialize TensorFlow.js and load model
   useEffect(() => {
     if (isOpen) {
       initializeModel();
+      // Fetch user phone number for SMS notifications
+      fetchUserPhone();
     } else {
       stopDetection();
       cleanup();
@@ -87,6 +102,68 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
       cleanup();
     };
   }, [isOpen]);
+
+  // Fetch user phone number from profile
+  const fetchUserPhone = async () => {
+    try {
+      const response = await fetch('/api/user/me', {
+        credentials: 'include',
+      });
+      const data = await response.json();
+      if (data.success && data.user?.phone_number) {
+        userPhoneRef.current = data.user.phone_number;
+        console.log('Phone number loaded from profile:', data.user.phone_number);
+      } else {
+        console.log('No phone number found in profile');
+        userPhoneRef.current = null;
+      }
+    } catch (error) {
+      console.error('Error fetching user phone:', error);
+      userPhoneRef.current = null;
+    }
+  };
+
+  // Send SMS notification for large fish detection
+  const sendSmsNotification = async (category: string, length: number, width: number) => {
+    // Only send for large fish
+    if (category !== 'Large') {
+      return;
+    }
+
+    // Check throttle (2 minutes)
+    const now = Date.now();
+    if (lastSmsSentRef.current && (now - lastSmsSentRef.current) < 2 * 60 * 1000) {
+      return; // Skip, still in throttle period
+    }
+
+    // Create SMS message (max 50 characters)
+    const message = `Large fish detected! ${length.toFixed(1)}cm x ${width.toFixed(1)}cm`;
+    const truncatedMessage = message.length > 50 ? message.substring(0, 47) + '...' : message;
+
+    try {
+      // Send SMS - phone number will be handled by API (from env or user profile)
+      const response = await fetch('/api/sms/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          message: truncatedMessage,
+          // Phone number is optional - API will use DEFAULT_PHONE_NUMBER from env if not provided
+          phoneNumber: userPhoneRef.current || undefined,
+        }),
+      });
+
+      const data = await response.json();
+      if (data.success) {
+        lastSmsSentRef.current = now;
+        console.log('SMS notification sent successfully');
+      } else {
+        console.error('SMS send failed:', data.message);
+      }
+    } catch (error) {
+      console.error('Error sending SMS:', error);
+    }
+  };
 
   const initializeModel = async () => {
     try {
@@ -1071,19 +1148,66 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
                     confidence: parseFloat(bestConfidence.toFixed(1)),
                   });
 
-                  // Save first detection to database (throttled)
+                  // Save first detection to database (throttled - only save if different from last saved)
                   if (fullDetections.length > 0) {
                     const firstDet = fullDetections[0];
-                    fetch('/api/fish-detection', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        length: firstDet.length.toFixed(2),
-                        width: firstDet.width.toFixed(2),
-                        category: firstDet.category,
-                        confidence: firstDet.confidence.toFixed(1),
-                      }),
-                    }).catch(err => console.error('Save error:', err));
+                    const now = Date.now();
+                    const detectionKey = {
+                      length: parseFloat(firstDet.length.toFixed(2)),
+                      width: parseFloat(firstDet.width.toFixed(2)),
+                      category: firstDet.category,
+                    };
+
+                    // Only save if this detection is different from the last one, or if it's been more than 5 seconds
+                    const shouldSave = !lastSavedDetectionRef.current ||
+                      lastSavedDetectionRef.current.length !== detectionKey.length ||
+                      lastSavedDetectionRef.current.width !== detectionKey.width ||
+                      lastSavedDetectionRef.current.category !== detectionKey.category ||
+                      (now - lastSavedDetectionRef.current.time) > 5000; // Save at least every 5 seconds
+
+                    if (shouldSave) {
+                      lastSavedDetectionRef.current = {
+                        ...detectionKey,
+                        time: now,
+                      };
+
+                      fetch('/api/fish-detection', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include', // Include cookies for authentication
+                        body: JSON.stringify({
+                          length: detectionKey.length.toFixed(2),
+                          width: detectionKey.width.toFixed(2),
+                          category: detectionKey.category,
+                          confidence: firstDet.confidence.toFixed(1),
+                        }),
+                      })
+                        .then(response => {
+                          if (!response.ok) {
+                            return response.json().then(data => {
+                              throw new Error(data.message || `Failed to save detection: ${response.status}`);
+                            });
+                          }
+                          return response.json();
+                        })
+                        .then(data => {
+                          if (data.success) {
+                            console.log('Detection saved successfully');
+
+                            // Send SMS notification for large fish (throttled to once per 2 minutes)
+                            if (detectionKey.category === 'Large') {
+                              sendSmsNotification(detectionKey.category, detectionKey.length, detectionKey.width);
+                            }
+                          }
+                        })
+                        .catch(err => {
+                          console.error('Save detection error:', err);
+                          // Reset last saved to allow retry on next detection
+                          if (err.message?.includes('401') || err.message?.includes('Unauthorized')) {
+                            console.warn('Authentication failed - user may need to log in again');
+                          }
+                        });
+                    }
                   }
 
                   if (soundEnabled && scaledDetections.length > 0) {
@@ -1131,8 +1255,25 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
     setSoundEnabled(!soundEnabled);
   };
 
-  const handleViewHistory = () => {
-    window.location.href = '/dashboard/fish-detection-history';
+  const handleViewHistory = async () => {
+    setHistoryOpen(true);
+    setLoadingHistory(true);
+    try {
+      const response = await fetch('/api/fish-detection?limit=50', {
+        credentials: 'include', // Include cookies for authentication
+      });
+      const data = await response.json();
+      if (data.success) {
+        setDetectionHistory(data.data || []);
+      } else {
+        setErrorMessage(data.message || 'Failed to load detection history');
+      }
+    } catch (error: any) {
+      console.error('History fetch error:', error);
+      setErrorMessage(error.message || 'Error loading detection history');
+    } finally {
+      setLoadingHistory(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -1144,58 +1285,59 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
         onClick={onClose}
       ></div>
 
-      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 max-w-[900px] w-[95%] max-h-[90vh] p-6 bg-gradient-to-b from-white/8 to-white/3 border border-white/14 backdrop-blur-xl rounded-2xl shadow-[0_10px_30px_rgba(0,0,0,0.35)] z-[9999] overflow-y-auto overflow-x-hidden text-[#e6e9ef] md:max-h-[92vh] md:p-5">
+      <div className="fixed top-0 left-0 right-0 bottom-0 md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:max-w-[1000px] md:w-[90%] md:max-h-[98vh] md:min-h-[85vh] w-full h-full md:h-auto md:rounded-2xl p-3 sm:p-4 md:p-4 bg-gradient-to-b from-white/8 to-white/3 border-0 md:border border-white/14 backdrop-blur-xl shadow-[0_10px_30px_rgba(0,0,0,0.35)] z-[9999] overflow-y-auto overflow-x-hidden text-[#e6e9ef]">
         <button
-          className="absolute top-4 right-4 bg-white/10 border-none text-[#e6e9ef] text-[28px] w-10 h-10 rounded-full cursor-pointer transition-all duration-300 flex items-center justify-center hover:bg-white/20"
+          className="absolute top-2 right-2 md:top-3 md:right-3 bg-white/10 border-none text-[#e6e9ef] text-xl md:text-2xl w-7 h-7 md:w-9 md:h-9 rounded-full cursor-pointer transition-all duration-300 flex items-center justify-center hover:bg-white/20"
           onClick={onClose}
           aria-label="Close modal"
         >
           &times;
         </button>
 
-        <h2 className="mt-0 mb-5 text-[28px] text-center text-[#e6e9ef]">
-          <i className="fas fa-fish text-blue-500 mr-2.5"></i> Fish Size Detection
+        <h2 className="mt-0 mb-1.5 md:mb-2 text-base sm:text-lg md:text-xl text-center text-[#e6e9ef]">
+          <i className="fas fa-fish text-blue-500 mr-2"></i> Fish Size Detection
         </h2>
 
-        <div className="grid grid-cols-4 gap-2.5 mb-6 p-4 bg-black/30 rounded-[10px] border border-white/10">
-          <div className="flex items-center gap-2 text-[13px]">
-            <i className="fas fa-server text-base text-[#888]"></i>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5 sm:gap-2 mb-1.5 md:mb-2 p-2 sm:p-2.5 md:p-2.5 bg-black/30 rounded-lg border border-white/10">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1 sm:gap-2 text-xs sm:text-[13px]">
+            <i className="fas fa-server text-sm sm:text-base text-[#888]"></i>
             <span className="text-[#e6e9ef]">
-              Server:{' '}
+              <span className="hidden sm:inline">Server: </span>
               <span className={`font-semibold ${serverStatus.server === 'online' ? 'text-green-500' : serverStatus.server === 'offline' ? 'text-red-500' : 'text-yellow-400'}`}>
                 {serverStatus.server === 'online' ? 'Online' : serverStatus.server === 'offline' ? 'Offline' : 'Checking...'}
               </span>
             </span>
           </div>
-          <div className="flex items-center gap-2 text-[13px]">
-            <i className="fas fa-video text-base text-[#888]"></i>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1 sm:gap-2 text-xs sm:text-[13px]">
+            <i className="fas fa-video text-sm sm:text-base text-[#888]"></i>
             <span className="text-[#e6e9ef]">
-              Camera:{' '}
+              <span className="hidden sm:inline">Camera: </span>
               <span className={`font-semibold ${serverStatus.camera === 'ready' ? 'text-green-500' : serverStatus.camera === 'unknown' ? 'text-red-500' : 'text-yellow-400'}`}>
                 {serverStatus.camera === 'ready' ? 'Ready' : serverStatus.camera === 'unknown' ? 'Unknown' : 'Not initialized'}
               </span>
             </span>
           </div>
-          <div className="flex items-center gap-2 text-[13px]">
-            <i className="fas fa-brain text-base text-[#888]"></i>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1 sm:gap-2 text-xs sm:text-[13px]">
+            <i className="fas fa-brain text-sm sm:text-base text-[#888]"></i>
             <span className="text-[#e6e9ef]">
-              Model:{' '}
+              <span className="hidden sm:inline">Model: </span>
               <span className={`font-semibold ${serverStatus.model === 'loaded' ? 'text-green-500' : serverStatus.model === 'unknown' ? 'text-red-500' : 'text-yellow-400'}`}>
-                {serverStatus.model === 'loaded' ? 'Loaded (TensorFlow.js)' : serverStatus.model === 'unknown' ? 'Unknown' : 'Not loaded'}
+                {serverStatus.model === 'loaded' ? 'Loaded' : serverStatus.model === 'unknown' ? 'Unknown' : 'Not loaded'}
+                <span className="hidden md:inline"> (TensorFlow.js)</span>
               </span>
             </span>
           </div>
-          <div className="flex items-center gap-2 text-[13px]">
-            <i className="fas fa-tachometer-alt text-base text-[#888]"></i>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-1 sm:gap-2 text-xs sm:text-[13px]">
+            <i className="fas fa-tachometer-alt text-sm sm:text-base text-[#888]"></i>
             <span className="text-[#e6e9ef]">
               FPS: <span className="font-semibold text-yellow-400">{serverStatus.fps}</span>
             </span>
           </div>
         </div>
 
-        <div className="mb-5 text-center">
+        <div className="mb-1.5 md:mb-2 text-center">
           <button
-            className={`px-[50px] py-[18px] text-xl font-bold border-none rounded-xl cursor-pointer transition-all duration-300 uppercase tracking-wider text-white ${detectionActive
+            className={`w-full sm:w-auto px-5 sm:px-7 md:px-9 py-1.5 sm:py-2 md:py-2.5 text-xs sm:text-sm md:text-sm font-bold border-none rounded-lg cursor-pointer transition-all duration-300 uppercase tracking-wider text-white ${detectionActive
               ? 'bg-gradient-to-br from-red-500 to-red-600 shadow-[0_4px_15px_rgba(239,68,68,0.3)]'
               : 'bg-gradient-to-br from-green-500 to-green-600 shadow-[0_4px_15px_rgba(34,197,94,0.3)] hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(34,197,94,0.4)]'
               } ${serverStatus.model !== 'loaded' ? 'opacity-60 cursor-not-allowed shadow-none' : ''}`}
@@ -1207,36 +1349,36 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
           </button>
         </div>
 
-        <div className="flex gap-2 justify-center flex-wrap mb-6">
-          {/* <button
+        <div className="flex gap-1.5 justify-center flex-wrap mb-1.5 md:mb-2">
+          <button
             className="px-[18px] py-2.5 text-sm font-semibold border-2 border-blue-500/50 rounded-lg cursor-pointer transition-all duration-300 bg-white/5 text-blue-500 backdrop-blur-sm hover:bg-blue-500/10 hover:border-blue-500 hover:-translate-y-0.5"
             onClick={handleViewHistory}
           >
             <i className="fas fa-history mr-1.5"></i> History
-          </button> */}
-          <button
-            className="px-[18px] py-2.5 text-sm font-semibold border-2 border-green-500/50 rounded-lg cursor-pointer transition-all duration-300 bg-white/5 text-green-500 backdrop-blur-sm hover:bg-green-500/10 hover:border-green-500 hover:-translate-y-0.5"
-            onClick={toggleFullscreen}
-          >
-            <i className={`fas ${fullscreen ? 'fa-compress' : 'fa-expand'} mr-1.5`}></i> Fullscreen
           </button>
           <button
-            className="px-[18px] py-2.5 text-sm font-semibold border-2 border-gray-400/50 rounded-lg cursor-pointer transition-all duration-300 bg-white/5 text-gray-400 backdrop-blur-sm hover:bg-gray-400/10 hover:border-gray-400 hover:-translate-y-0.5"
+            className="px-3 sm:px-[18px] py-2 sm:py-2.5 text-xs sm:text-sm font-semibold border-2 border-green-500/50 rounded-lg cursor-pointer transition-all duration-300 bg-white/5 text-green-500 backdrop-blur-sm hover:bg-green-500/10 hover:border-green-500 hover:-translate-y-0.5"
+            onClick={toggleFullscreen}
+          >
+            <i className={`fas ${fullscreen ? 'fa-compress' : 'fa-expand'} mr-1 sm:mr-1.5`}></i> <span className="hidden sm:inline">Fullscreen</span>
+          </button>
+          <button
+            className="px-3 sm:px-[18px] py-2 sm:py-2.5 text-xs sm:text-sm font-semibold border-2 border-gray-400/50 rounded-lg cursor-pointer transition-all duration-300 bg-white/5 text-gray-400 backdrop-blur-sm hover:bg-gray-400/10 hover:border-gray-400 hover:-translate-y-0.5"
             onClick={toggleSound}
           >
-            <i className={`fas ${soundEnabled ? 'fa-volume-up' : 'fa-volume-mute'} mr-1.5`}></i> Sound
+            <i className={`fas ${soundEnabled ? 'fa-volume-up' : 'fa-volume-mute'} mr-1 sm:mr-1.5`}></i> <span className="hidden sm:inline">Sound</span>
           </button>
         </div>
 
         {errorMessage && (
-          <div className="text-center mb-5 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-[15px] font-semibold">
-            <span className="text-lg mr-2">⚠️</span>
+          <div className="text-center mb-2 md:mb-3 p-2 bg-red-500/10 border border-red-500/30 rounded-lg text-xs sm:text-sm font-semibold">
+            <span className="text-sm sm:text-base mr-2">⚠️</span>
             <span className="text-red-500">{errorMessage}</span>
           </div>
         )}
 
-        <div id="camera-feed-container" className="mb-6">
-          <div className="relative bg-black rounded-xl overflow-hidden min-h-[350px] max-h-[450px] flex items-center justify-center border-2 border-white/10">
+        <div id="camera-feed-container" className="mb-2 md:mb-3">
+          <div className="relative bg-black rounded-lg overflow-hidden min-h-[150px] sm:min-h-[200px] md:min-h-[220px] max-h-[220px] sm:max-h-[280px] md:max-h-[260px] flex items-center justify-center border-2 border-white/10">
             <video
               ref={videoRef}
               autoPlay
@@ -1247,27 +1389,27 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
             />
             <canvas
               ref={canvasRef}
-              className="w-full h-auto max-h-[450px] object-contain bg-black block relative z-10"
+              className="w-full h-auto max-h-[220px] sm:max-h-[280px] md:max-h-[260px] object-contain bg-black block relative z-10"
               style={{
                 imageRendering: 'auto',
                 display: detectionActive ? 'block' : 'none'
               }}
             />
             {!detectionActive && (
-              <div className="text-[#888] text-center p-10">
-                <i className="fas fa-video-slash text-[64px] mb-5 text-[#555]"></i>
-                <p className="text-lg mb-2.5">Click &quot;Start Detection&quot; to begin</p>
-                <small className="text-[13px] text-[#666]">Camera access will be requested</small>
+              <div className="text-[#888] text-center p-2 sm:p-3 md:p-4">
+                <i className="fas fa-video-slash text-2xl sm:text-3xl md:text-4xl mb-1 sm:mb-2 text-[#555]"></i>
+                <p className="text-[10px] sm:text-xs md:text-sm mb-0.5 md:mb-1">Click &quot;Start Detection&quot; to begin</p>
+                <small className="text-[9px] sm:text-[10px] text-[#666]">Camera access will be requested</small>
               </div>
             )}
           </div>
         </div>
 
-        <div className="mb-5 p-5 bg-black/30 rounded-xl border border-white/10">
-          <h4 className="m-0 mb-4 text-lg text-[#e6e9ef] flex items-center gap-2">
-            <i className="fas fa-chart-line text-blue-500"></i> Latest Detection
+        <div className="mb-0 p-2 sm:p-2.5 md:p-2.5 bg-black/30 rounded-lg border border-white/10">
+          <h4 className="m-0 mb-1.5 md:mb-2 text-xs sm:text-sm md:text-sm text-[#e6e9ef] flex items-center gap-1.5 flex-wrap">
+            <i className="fas fa-chart-line text-blue-500 text-sm"></i> Latest Detection
             {allDetections.length > 0 && (
-              <span className="ml-2 text-sm text-yellow-400 font-semibold">
+              <span className="ml-1 text-[10px] sm:text-xs text-yellow-400 font-semibold">
                 ({allDetections.length} {allDetections.length === 1 ? 'fish' : 'fish detected'})
               </span>
             )}
@@ -1275,7 +1417,7 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
 
           {/* Show all detections if multiple */}
           {allDetections.length > 1 && (
-            <div className="mb-4 p-3 bg-white/5 rounded-lg border border-white/5">
+            <div className="mb-1.5 p-1.5 bg-white/5 rounded-lg border border-white/5">
               <div className="text-xs text-[#888] mb-2 font-semibold uppercase tracking-wider">All Detections:</div>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
                 {allDetections.map((det, idx) => {
@@ -1305,38 +1447,38 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
             </div>
           )}
 
-          <div className="grid grid-cols-4 gap-4">
-            <div className="flex items-center gap-3 p-3 bg-white/3 rounded-lg border border-white/5">
-              <div className="w-10 h-10 flex items-center justify-center bg-blue-500/10 rounded-lg text-lg text-blue-500">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5 sm:gap-2 md:gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2 p-1.5 sm:p-2 md:p-2 bg-white/3 rounded-lg border border-white/5">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 flex items-center justify-center bg-blue-500/10 rounded-lg text-sm sm:text-base text-blue-500 shrink-0">
                 <i className="fas fa-ruler-horizontal"></i>
               </div>
-              <div className="flex-1 flex flex-col gap-0.5">
-                <span className="text-[11px] uppercase text-[#888] font-semibold tracking-wider">Length</span>
-                <span className="text-xl font-bold text-[#e6e9ef]">{detectionInfo.length?.toFixed(2) || '--'}</span>
-                <span className="text-xs text-[#888] ml-0.5">cm</span>
+              <div className="flex-1 flex flex-col gap-0 min-w-0">
+                <span className="text-[9px] sm:text-[10px] uppercase text-[#888] font-semibold tracking-wider">Length</span>
+                <span className="text-sm sm:text-base md:text-lg font-bold text-[#e6e9ef]">{detectionInfo.length?.toFixed(2) || '--'}</span>
+                <span className="text-[10px] sm:text-xs text-[#888]">cm</span>
               </div>
             </div>
-            <div className="flex items-center gap-3 p-3 bg-white/3 rounded-lg border border-white/5">
-              <div className="w-10 h-10 flex items-center justify-center bg-blue-500/10 rounded-lg text-lg text-blue-500">
+            <div className="flex items-center gap-1.5 sm:gap-2 p-1.5 sm:p-2 md:p-2 bg-white/3 rounded-lg border border-white/5">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 flex items-center justify-center bg-blue-500/10 rounded-lg text-sm sm:text-base text-blue-500 shrink-0">
                 <i className="fas fa-ruler-vertical"></i>
               </div>
-              <div className="flex-1 flex flex-col gap-0.5">
-                <span className="text-[11px] uppercase text-[#888] font-semibold tracking-wider">Width</span>
-                <span className="text-xl font-bold text-[#e6e9ef]">{detectionInfo.width?.toFixed(2) || '--'}</span>
-                <span className="text-xs text-[#888] ml-0.5">cm</span>
+              <div className="flex-1 flex flex-col gap-0 min-w-0">
+                <span className="text-[9px] sm:text-[10px] uppercase text-[#888] font-semibold tracking-wider">Width</span>
+                <span className="text-sm sm:text-base md:text-lg font-bold text-[#e6e9ef]">{detectionInfo.width?.toFixed(2) || '--'}</span>
+                <span className="text-[10px] sm:text-xs text-[#888]">cm</span>
               </div>
             </div>
-            <div className="flex items-center gap-3 p-3 bg-white/3 rounded-lg border border-white/5">
-              <div className={`w-10 h-10 flex items-center justify-center rounded-lg text-lg ${detectionInfo.category?.toLowerCase() === 'small' ? 'bg-green-500/10 text-green-500' :
+            <div className="flex items-center gap-1.5 sm:gap-2 p-1.5 sm:p-2 md:p-2 bg-white/3 rounded-lg border border-white/5">
+              <div className={`w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 flex items-center justify-center rounded-lg text-sm sm:text-base shrink-0 ${detectionInfo.category?.toLowerCase() === 'small' ? 'bg-green-500/10 text-green-500' :
                 detectionInfo.category?.toLowerCase() === 'medium' ? 'bg-yellow-500/10 text-yellow-500' :
                   detectionInfo.category?.toLowerCase() === 'large' ? 'bg-red-500/10 text-red-500' :
                     'bg-blue-500/10 text-blue-500'
                 }`}>
                 <i className="fas fa-fish"></i>
               </div>
-              <div className="flex-1 flex flex-col gap-0.5">
-                <span className="text-[11px] uppercase text-[#888] font-semibold tracking-wider">Category</span>
-                <span className={`inline-block px-3 py-1 rounded-[20px] text-sm font-semibold ${detectionInfo.category?.toLowerCase() === 'small' ? 'bg-green-500/20 text-green-500 border border-green-500/30' :
+              <div className="flex-1 flex flex-col gap-0 min-w-0">
+                <span className="text-[9px] sm:text-[10px] uppercase text-[#888] font-semibold tracking-wider">Category</span>
+                <span className={`inline-block px-1.5 sm:px-2 py-0.5 rounded-[20px] text-[10px] sm:text-xs font-semibold ${detectionInfo.category?.toLowerCase() === 'small' ? 'bg-green-500/20 text-green-500 border border-green-500/30' :
                   detectionInfo.category?.toLowerCase() === 'medium' ? 'bg-yellow-500/20 text-yellow-500 border border-yellow-500/30' :
                     detectionInfo.category?.toLowerCase() === 'large' ? 'bg-red-500/20 text-red-500 border border-red-500/30' :
                       'text-[#e6e9ef]'
@@ -1345,19 +1487,104 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
                 </span>
               </div>
             </div>
-            <div className="flex items-center gap-3 p-3 bg-white/3 rounded-lg border border-white/5">
-              <div className="w-10 h-10 flex items-center justify-center bg-blue-500/10 rounded-lg text-lg text-blue-500">
+            <div className="flex items-center gap-1.5 sm:gap-2 p-1.5 sm:p-2 md:p-2 bg-white/3 rounded-lg border border-white/5">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 md:w-9 md:h-9 flex items-center justify-center bg-blue-500/10 rounded-lg text-sm sm:text-base text-blue-500 shrink-0">
                 <i className="fas fa-percentage"></i>
               </div>
-              <div className="flex-1 flex flex-col gap-0.5">
-                <span className="text-[11px] uppercase text-[#888] font-semibold tracking-wider">Confidence</span>
-                <span className="text-xl font-bold text-[#e6e9ef]">{detectionInfo.confidence?.toFixed(1) || '--'}</span>
-                <span className="text-xs text-[#888] ml-0.5">%</span>
+              <div className="flex-1 flex flex-col gap-0 min-w-0">
+                <span className="text-[9px] sm:text-[10px] uppercase text-[#888] font-semibold tracking-wider">Confidence</span>
+                <span className="text-sm sm:text-base md:text-lg font-bold text-[#e6e9ef]">{detectionInfo.confidence?.toFixed(1) || '--'}</span>
+                <span className="text-[10px] sm:text-xs text-[#888]">%</span>
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* History Modal */}
+      {historyOpen && (
+        <>
+          <div
+            className="fixed inset-0 bg-black/70 z-[10000]"
+            onClick={() => setHistoryOpen(false)}
+          ></div>
+          <div className="fixed top-0 left-0 right-0 bottom-0 md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:max-w-[800px] md:w-[90%] md:max-h-[85vh] md:h-auto w-full h-full rounded-none md:rounded-2xl bg-gradient-to-b from-white/8 to-white/3 border-0 md:border border-white/14 backdrop-blur-xl shadow-[0_10px_30px_rgba(0,0,0,0.35)] z-[10001] overflow-y-auto overflow-x-hidden text-[#e6e9ef] p-4 sm:p-5 md:p-6">
+            <div className="flex items-center justify-between mb-4 md:mb-5">
+              <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-[#e6e9ef]">
+                <i className="fas fa-history text-blue-500 mr-2"></i> Detection History
+              </h3>
+              <button
+                className="bg-white/10 border-none text-[#e6e9ef] text-2xl sm:text-3xl w-8 h-8 sm:w-10 sm:h-10 md:w-10 md:h-10 rounded-full cursor-pointer transition-all duration-300 flex items-center justify-center hover:bg-white/20 active:bg-white/30 touch-manipulation"
+                onClick={() => setHistoryOpen(false)}
+                aria-label="Close history"
+              >
+                &times;
+              </button>
+            </div>
+
+            {loadingHistory ? (
+              <div className="text-center py-10 sm:py-16">
+                <i className="fas fa-spinner fa-spin text-3xl sm:text-4xl text-blue-500 mb-3"></i>
+                <p className="text-sm sm:text-base text-[#a2a8b6]">Loading history...</p>
+              </div>
+            ) : detectionHistory.length === 0 ? (
+              <div className="text-center py-10 sm:py-16">
+                <i className="fas fa-inbox text-4xl sm:text-5xl text-[#555] mb-3 sm:mb-4"></i>
+                <p className="text-sm sm:text-base text-[#a2a8b6]">No detection history yet</p>
+                <p className="text-xs sm:text-sm text-[#888] mt-2">Start detecting fish to see history here</p>
+              </div>
+            ) : (
+              <div className="space-y-2.5 sm:space-y-3">
+                {detectionHistory.map((detection) => (
+                  <div
+                    key={detection.id}
+                    className="p-3 sm:p-4 bg-black/30 rounded-lg border border-white/10 hover:bg-black/40 active:bg-black/50 transition-colors touch-manipulation"
+                  >
+                    <div className="flex items-start justify-between gap-2 sm:gap-3 mb-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2 flex-wrap">
+                          <div className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full flex-shrink-0 ${detection.sizeCategory === 'Small' ? 'bg-green-500' :
+                            detection.sizeCategory === 'Medium' ? 'bg-yellow-500' :
+                              'bg-red-500'
+                            }`}></div>
+                          <span className="font-semibold text-sm sm:text-base text-[#e6e9ef]">
+                            {detection.sizeCategory} Fish
+                          </span>
+                          {detection.confidenceScore !== null && (
+                            <span className="text-[10px] sm:text-xs text-[#888] whitespace-nowrap">
+                              ({(parseFloat(detection.confidenceScore.toString()) * 100).toFixed(1)}% confidence)
+                            </span>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2 sm:gap-2.5 text-xs sm:text-sm">
+                          <div className="break-words">
+                            <span className="text-[#888]">Length: </span>
+                            <span className="font-semibold text-[#e6e9ef]">
+                              {parseFloat(detection.detectedLength.toString()).toFixed(2)} cm
+                            </span>
+                          </div>
+                          <div className="break-words">
+                            <span className="text-[#888]">Width: </span>
+                            <span className="font-semibold text-[#e6e9ef]">
+                              {parseFloat(detection.detectedWidth.toString()).toFixed(2)} cm
+                            </span>
+                          </div>
+                          <div className="col-span-1 sm:col-span-2 md:col-span-2 break-words">
+                            <span className="text-[#888]">Time: </span>
+                            <span className="font-semibold text-[#e6e9ef]">
+                              {new Date(detection.detectionTimestamp).toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </>
   );
 }

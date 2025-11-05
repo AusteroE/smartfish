@@ -145,11 +145,11 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 pt-5">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 pt-5 pb-10 md:pb-0">
         {/* Water Temperature Card */}
-        <div className="bg-gradient-to-b from-white/6 to-white/2 border border-white/8 rounded-xl sm:rounded-2xl p-5 sm:p-8 min-h-[160px] sm:min-h-[180px] backdrop-blur-sm shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
-          <h3 className="text-lg sm:text-xl font-semibold text-[#e6e9ef] mb-4 sm:mb-5">Water Temperature</h3>
-          <div className="text-center py-2">
+        <div className="bg-gradient-to-b from-white/6 to-white/2 border border-white/8 rounded-xl sm:rounded-2xl p-5 sm:p-8 min-h-[180px] sm:min-h-[200px] md:min-h-[180px] backdrop-blur-sm shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+          <h3 className="text-lg sm:text-xl font-semibold text-[#e6e9ef] mb-3 sm:mb-4 md:mb-5">Water Temperature</h3>
+          <div className="text-center py-2 pb-3 sm:pb-2">
             <div className={`text-3xl sm:text-4xl font-bold ${tempStatus.color === 'green' ? 'text-green-500' :
               tempStatus.color === 'orange' ? 'text-orange-500' :
                 tempStatus.color === 'red' ? 'text-red-500' :
@@ -161,9 +161,9 @@ export default function DashboardPage() {
         </div>
 
         {/* Fish Sizes Card */}
-        <div className="bg-gradient-to-b from-white/6 to-white/2 border border-white/8 rounded-xl sm:rounded-2xl p-5 sm:p-8 min-h-[160px] sm:min-h-[180px] backdrop-blur-sm shadow-[0_10px_30px_rgba(0,0,0,0.35)] cursor-pointer hover:scale-105 transition-transform"
+        <div className="bg-gradient-to-b from-white/6 to-white/2 border border-white/8 rounded-xl sm:rounded-2xl p-5 sm:p-8 min-h-[180px] sm:min-h-[200px] md:min-h-[180px] backdrop-blur-sm shadow-[0_10px_30px_rgba(0,0,0,0.35)] cursor-pointer hover:scale-105 transition-transform"
           onClick={() => setCameraModalOpen(true)}>
-          <h3 className="text-lg sm:text-xl font-semibold text-[#e6e9ef] mb-4 sm:mb-5">Fish Sizes</h3>
+          <h3 className="text-lg sm:text-xl font-semibold text-[#e6e9ef] mb-3 sm:mb-4 md:mb-5">Fish Sizes</h3>
           <div className="flex flex-col items-center justify-center h-full">
             <div className="w-16 h-16 sm:w-20 sm:h-20 bg-[#7c5cff]/20 rounded-full flex items-center justify-center mb-3">
               <i className="fas fa-camera text-2xl sm:text-3xl text-[#7c5cff]"></i>
@@ -173,9 +173,9 @@ export default function DashboardPage() {
         </div>
 
         {/* Water Quality Level Card */}
-        <div className="bg-gradient-to-b from-white/6 to-white/2 border border-white/8 rounded-xl sm:rounded-2xl p-5 sm:p-8 min-h-[160px] sm:min-h-[180px] backdrop-blur-sm shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
-          <h3 className="text-lg sm:text-xl font-semibold text-[#e6e9ef] mb-4 sm:mb-5">Water Quality Level</h3>
-          <div className="text-center py-2">
+        <div className="bg-gradient-to-b from-white/6 to-white/2 border border-white/8 rounded-xl sm:rounded-2xl p-5 sm:p-8 min-h-[180px] sm:min-h-[200px] md:min-h-[180px] backdrop-blur-sm shadow-[0_10px_30px_rgba(0,0,0,0.35)]">
+          <h3 className="text-lg sm:text-xl font-semibold text-[#e6e9ef] mb-3 sm:mb-4 md:mb-5">Water Quality Level</h3>
+          <div className="text-center py-2 pb-3 sm:pb-2">
             {sensorData.ph !== null && !isNaN(sensorData.ph) ? (
               <>
                 <div className={`text-3xl sm:text-4xl font-bold ${phStatus.color === 'green' ? 'text-green-500' :
@@ -185,7 +185,7 @@ export default function DashboardPage() {
                   }`}>
                   {sensorData.ph.toFixed(2)}
                 </div>
-                <div className={`text-sm mt-2 ${phStatus.color === 'green' ? 'text-green-400' :
+                <div className={`text-sm sm:text-base mt-2 mb-1 ${phStatus.color === 'green' ? 'text-green-400' :
                   phStatus.color === 'orange' ? 'text-orange-400' :
                     phStatus.color === 'red' ? 'text-red-400' :
                       'text-gray-400'

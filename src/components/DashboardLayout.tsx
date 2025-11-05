@@ -3,8 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import Sidebar from './Sidebar';
-import SettingsPanel from './SettingsPanel';
+import Sidebar, { getNavItems } from './Sidebar';
 import PWAInstallPrompt from './PWAInstallPrompt';
 
 interface User {
@@ -24,7 +23,6 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     const pathname = usePathname();
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
-    const [settingsOpen, setSettingsOpen] = useState(false);
     const [sidebarOpen, setSidebarOpen] = useState(false);
 
     useEffect(() => {
@@ -99,85 +97,50 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-[#0b1020] via-[#0b1020] to-[#0b1020] overflow-x-hidden">
-            {/* Mobile Menu Button */}
-            <button
-                onClick={() => setSidebarOpen(true)}
-                className="md:hidden fixed top-4 left-4 z-[1001] w-10 h-10 flex items-center justify-center rounded-lg bg-[#121830] border border-white/8 text-[#e6e9ef] hover:bg-[#7c5cff]/20 transition-colors"
-                aria-label="Open menu"
-            >
-                <i className="fas fa-bars text-lg"></i>
-            </button>
 
-            {/* Fixed Sidebar */}
+            {/* Fixed Sidebar - Desktop only */}
             <Sidebar
                 user={user}
-                onSettingsClick={() => setSettingsOpen(true)}
+                onSettingsClick={() => router.push('/dashboard/settings')}
                 isMobileOpen={sidebarOpen}
                 onMobileClose={() => setSidebarOpen(false)}
             />
 
             {/* Main Content */}
-            <main className="flex-1 md:ml-[280px] p-4 sm:p-6 md:p-10 bg-transparent min-h-screen pb-20 md:pb-0 pt-14 md:pt-0">
+            <main className="flex-1 md:ml-[280px] p-4 sm:p-6 md:p-10 bg-transparent min-h-screen pb-32 md:pb-10">
                 <div className="max-w-7xl mx-auto">
                     {children}
                 </div>
             </main>
 
-            {/* Settings Panel */}
-            <SettingsPanel
-                isOpen={settingsOpen}
-                onClose={() => setSettingsOpen(false)}
-                user={user}
-                onUserUpdate={(updatedUser) => {
-                    setUser({
-                        ...updatedUser,
-                        role: updatedUser.role || user.role,
-                    });
-                }}
-            />
-
             {/* PWA Install Prompt */}
             <PWAInstallPrompt />
 
             {/* Mobile Bottom Navigation */}
-            <nav className="md:hidden fixed bottom-0 left-0 w-full bg-gradient-to-t from-white/6 to-white/2 backdrop-blur-[20px] shadow-[0_-8px_32px_rgba(0,0,0,0.4)] border-t border-white/8 flex justify-around items-center px-2 pt-3 pb-4 z-[1000] safe-area-inset-bottom">
-                <Link
-                    href={pathname?.startsWith('/admin') ? '/admin/dashboard' : '/dashboard'}
-                    className={`flex flex-col items-center justify-center p-2 rounded-xl min-w-[60px] min-h-[60px] transition-all duration-300 ${pathname === '/dashboard' || pathname === '/admin/dashboard' ? 'text-[#7c5cff] bg-[#7c5cff]/20' : 'text-white/50'}`}
-                >
-                    <i className="fas fa-home text-xl mb-1"></i>
-                    <span className="text-[10px] font-medium">Home</span>
-                </Link>
-                {!pathname?.startsWith('/admin') && (
-                    <>
-                        <Link
-                            href="/dashboard/records"
-                            className={`flex flex-col items-center justify-center p-2 rounded-xl min-w-[60px] min-h-[60px] transition-all duration-300 ${pathname === '/dashboard/records' ? 'text-[#7c5cff] bg-[#7c5cff]/20' : 'text-white/50'}`}
-                        >
-                            <i className="fas fa-table text-xl mb-1"></i>
-                            <span className="text-[10px] font-medium">Records</span>
-                        </Link>
-                        <Link
-                            href="/dashboard/alerts"
-                            className={`flex flex-col items-center justify-center p-2 rounded-xl min-w-[60px] min-h-[60px] transition-all duration-300 ${pathname === '/dashboard/alerts' ? 'text-[#7c5cff] bg-[#7c5cff]/20' : 'text-white/50'}`}
-                        >
-                            <i className="fas fa-bell text-xl mb-1"></i>
-                            <span className="text-[10px] font-medium">Alerts</span>
-                        </Link>
-                    </>
-                )}
-                <a
-                    href="#"
-                    onClick={(e) => {
-                        e.preventDefault();
-                        setSettingsOpen(true);
-                    }}
-                    className={`flex flex-col items-center justify-center p-2 rounded-xl min-w-[60px] min-h-[60px] transition-all duration-300 ${settingsOpen ? 'text-[#7c5cff] bg-[#7c5cff]/20' : 'text-white/50'}`}
-                >
-                    <i className="fas fa-cog text-xl mb-1"></i>
-                    <span className="text-[10px] font-medium">Settings</span>
-                </a>
-            </nav>
+            {user && (
+                <nav className="md:hidden fixed bottom-0 left-0 right-0 w-full bg-gradient-to-t from-[#121830]/95 to-[#0d1220]/95 backdrop-blur-[20px] shadow-[0_-8px_32px_rgba(0,0,0,0.4)] border-t border-white/8 flex justify-around items-center px-2 pt-3 pb-4 z-[1000]" style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
+                    {getNavItems(user.role === 'admin', pathname?.startsWith('/admin') || false).map((item) => {
+                        const isActive = pathname === item.href;
+                        return (
+                            <Link
+                                key={item.href}
+                                href={item.href}
+                                className={`flex flex-col items-center justify-center p-2 rounded-xl min-w-[60px] min-h-[60px] transition-all duration-300 ${isActive ? 'text-[#7c5cff] bg-[#7c5cff]/20' : 'text-white/50 hover:text-white/70'}`}
+                            >
+                                <i className={`fas ${item.icon} text-xl mb-1`}></i>
+                                <span className="text-[10px] font-medium">{item.label}</span>
+                            </Link>
+                        );
+                    })}
+                    <Link
+                        href="/dashboard/settings"
+                        className={`flex flex-col items-center justify-center p-2 rounded-xl min-w-[60px] min-h-[60px] transition-all duration-300 ${pathname === '/dashboard/settings' ? 'text-[#7c5cff] bg-[#7c5cff]/20' : 'text-white/50 hover:text-white/70'}`}
+                    >
+                        <i className="fas fa-cog text-xl mb-1"></i>
+                        <span className="text-[10px] font-medium">Settings</span>
+                    </Link>
+                </nav>
+            )}
 
             <style jsx global>{`
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');

@@ -3,7 +3,8 @@
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
+import { getProfileImageUrl } from '@/lib/upload';
 
 interface User {
     id: number;
@@ -20,16 +21,9 @@ interface SidebarProps {
     onMobileClose?: () => void;
 }
 
-export default function Sidebar({ user, onSettingsClick, isMobileOpen = false, onMobileClose }: SidebarProps) {
-    const pathname = usePathname();
-    const router = useRouter();
-    const [logoutLoading, setLogoutLoading] = useState(false);
-
-    const isAdmin = user.role === 'admin';
-    const isAdminRoute = pathname?.startsWith('/admin') || false;
-
-    // Simplified navigation for admin dashboard
-    const navItems = isAdminRoute
+// Export nav items for use in bottom navigation
+export function getNavItems(isAdmin: boolean, isAdminRoute: boolean) {
+    return isAdminRoute
         ? [
             { href: '/admin/dashboard', icon: 'fa-home', label: 'Dashboard' },
         ]
@@ -44,6 +38,18 @@ export default function Sidebar({ user, onSettingsClick, isMobileOpen = false, o
                 { href: '/dashboard/records', icon: 'fa-table', label: 'Records' },
                 { href: '/dashboard/alerts', icon: 'fa-bell', label: 'Alerts' },
             ];
+}
+
+export default function Sidebar({ user, onSettingsClick, isMobileOpen = false, onMobileClose }: SidebarProps) {
+    const pathname = usePathname();
+    const router = useRouter();
+    const [logoutLoading, setLogoutLoading] = useState(false);
+
+    const isAdmin = user.role === 'admin';
+    const isAdminRoute = pathname?.startsWith('/admin') || false;
+
+    // Simplified navigation for admin dashboard
+    const navItems = getNavItems(isAdmin, isAdminRoute);
 
     const handleLogout = async () => {
         if (confirm('Are you sure you want to logout?')) {
@@ -63,55 +69,18 @@ export default function Sidebar({ user, onSettingsClick, isMobileOpen = false, o
     };
 
     const getProfileImageSrc = () => {
-        if (!user.profile_image) {
-            return '/frontend/img/default profile.png';
-        }
-        if (user.profile_image.startsWith('/')) {
-            return user.profile_image;
-        }
-        if (user.profile_image.startsWith('uploads/')) {
-            return `/${user.profile_image}`;
-        }
-        if (user.profile_image.startsWith('frontend/')) {
-            return `/${user.profile_image}`;
-        }
-        return `/frontend/img/${user.profile_image}`;
+        return getProfileImageUrl(user.profile_image);
     };
 
-    // Close mobile sidebar when route changes
-    useEffect(() => {
-        if (isMobileOpen && onMobileClose) {
-            onMobileClose();
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [pathname]);
 
     return (
         <>
-            {/* Mobile Overlay */}
-            {isMobileOpen && (
-                <div
-                    className="fixed inset-0 bg-black/60 z-[999] md:hidden"
-                    onClick={onMobileClose}
-                />
-            )}
-
-            {/* Sidebar */}
+            {/* Sidebar - Hidden on mobile, shown on desktop */}
             <aside className={`
+                hidden md:block
                 fixed top-0 left-0 h-screen w-[280px] bg-gradient-to-b from-[#121830] to-[#0d1220] border-r border-white/8 overflow-y-auto overflow-x-hidden z-[1000] px-5 py-6 md:py-8
-                transition-transform duration-300 ease-in-out
-                ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}
-                md:translate-x-0
                 shadow-[4px_0_20px_rgba(0,0,0,0.3)]
             `}>
-                {/* Mobile Close Button */}
-                <button
-                    onClick={onMobileClose}
-                    className="md:hidden absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 text-[#e6e9ef] transition-colors"
-                    aria-label="Close sidebar"
-                >
-                    <i className="fas fa-times text-lg"></i>
-                </button>
 
                 {/* Sidebar Header */}
                 <div className="mb-8 md:mb-10 mt-0 md:mt-0">
@@ -166,20 +135,21 @@ export default function Sidebar({ user, onSettingsClick, isMobileOpen = false, o
                             );
                         })}
                         <li className="pt-2 mt-2 border-t border-white/8">
-                            <a
-                                href="#"
-                                onClick={(e) => {
-                                    e.preventDefault();
-                                    onSettingsClick();
+                            <Link
+                                href="/dashboard/settings"
+                                onClick={() => {
                                     if (onMobileClose) {
                                         onMobileClose();
                                     }
                                 }}
-                                className="flex items-center px-4 py-3 rounded-xl transition-all duration-300 font-medium text-sm text-[#e6e9ef] hover:bg-[#7c5cff]/20 hover:border hover:border-[#7c5cff]/35 whitespace-nowrap"
+                                className={`flex items-center px-4 py-3 rounded-xl transition-all duration-300 font-medium text-sm whitespace-nowrap ${pathname === '/dashboard/settings'
+                                    ? 'bg-[#7c5cff]/30 border border-[#7c5cff]/50 text-white shadow-[0_2px_8px_rgba(124,92,255,0.3)]'
+                                    : 'text-[#e6e9ef] hover:bg-[#7c5cff]/20 hover:border hover:border-[#7c5cff]/35'
+                                    }`}
                             >
                                 <i className="fas fa-cog mr-3 w-4 text-base flex-shrink-0"></i>
                                 <span className="truncate">Settings</span>
-                            </a>
+                            </Link>
                         </li>
                         <li>
                             <a

@@ -29,13 +29,24 @@ export async function POST(request: NextRequest) {
         }
 
         // Save detection to database
+        // Convert confidence from percentage (0-100) to decimal (0-1) if needed
+        let confidenceDecimal: number | null = null;
+        if (confidence !== null && confidence !== undefined) {
+            const confValue = parseFloat(confidence.toString());
+            // If confidence is > 1, it's a percentage (0-100), convert to decimal (0-1)
+            // If confidence is <= 1, it's already a decimal (0-1)
+            confidenceDecimal = confValue > 1 ? confValue / 100 : confValue;
+            // Ensure it's between 0 and 1
+            confidenceDecimal = Math.max(0, Math.min(1, confidenceDecimal));
+        }
+
         const detection = await prisma.fishDetection.create({
             data: {
                 userId: userId,
                 detectedLength: parseFloat(length.toString()),
                 detectedWidth: parseFloat(width.toString()),
                 sizeCategory: category,
-                confidenceScore: confidence ? parseFloat(confidence.toString()) : null,
+                confidenceScore: confidenceDecimal,
             },
         });
 

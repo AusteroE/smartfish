@@ -13,8 +13,15 @@ export default function Home() {
   const [signUpOpen, setSignUpOpen] = useState(false);
   const [termsOpen, setTermsOpen] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
+    // Force dark background for landing page
+    document.documentElement.style.backgroundColor = '#0b1020';
+    document.body.style.backgroundColor = '#0b1020';
+    document.body.style.color = '#e6e9ef';
+
     // Check for verification message in URL
     const params = new URLSearchParams(window.location.search);
     if (params.get('verified') === 'true') {
@@ -37,6 +44,13 @@ export default function Home() {
       // Keep redirect parameter in URL for sign-in modal to use
       // Don't remove it yet - the sign-in modal needs it
     }
+
+    // Cleanup function to restore original styles when component unmounts
+    return () => {
+      document.documentElement.style.backgroundColor = '';
+      document.body.style.backgroundColor = '';
+      document.body.style.color = '';
+    };
   }, []);
 
   return (
@@ -44,12 +58,131 @@ export default function Home() {
       <style jsx global>{`
         @import url('https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css');
       `}</style>
-      <div className="min-h-screen flex items-center justify-center bg-[radial-gradient(1200px_600px_at_20%_-10%,rgba(124,92,255,0.18),transparent),radial-gradient(900px_500px_at_100%_10%,rgba(76,201,240,0.15),transparent),#0b1020] p-4 sm:p-5 font-['Inter',system-ui,-apple-system,sans-serif] text-[#e6e9ef]">
+      <div className="min-h-screen flex items-center justify-center bg-[radial-gradient(1200px_600px_at_20%_-10%,rgba(124,92,255,0.18),transparent),radial-gradient(900px_500px_at_100%_10%,rgba(76,201,240,0.15),transparent),#0b1020] p-4 sm:p-5 font-['Inter',system-ui,-apple-system,sans-serif] text-[#e6e9ef] relative overflow-hidden" style={{ backgroundColor: '#0b1020' }}>
+        {/* Animated Fish Background - Client-side only to avoid hydration mismatch */}
+        {mounted && (
+          <div className="fish-container">
+            <div className="fish fish-1">
+              <svg viewBox="0 0 100 60" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="fishGradient1" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" style={{ stopColor: '#7c5cff', stopOpacity: 0.8 }} />
+                    <stop offset="50%" style={{ stopColor: '#4cc9f0', stopOpacity: 0.6 }} />
+                    <stop offset="100%" style={{ stopColor: '#7c5cff', stopOpacity: 0.8 }} />
+                  </linearGradient>
+                </defs>
+                <path d="M20 30 Q10 20, 10 30 Q10 40, 20 30" fill="url(#fishGradient1)" />
+                <ellipse cx="35" cy="30" rx="25" ry="15" fill="url(#fishGradient1)" />
+                <path d="M60 30 L75 25 L75 30 L75 35 Z" fill="url(#fishGradient1)" />
+                <circle cx="45" cy="28" r="3" fill="#4cc9f0" opacity="0.9" />
+              </svg>
+            </div>
+            <div className="fish fish-2">
+              <svg viewBox="0 0 100 60" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="fishGradient2" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" style={{ stopColor: '#4cc9f0', stopOpacity: 0.7 }} />
+                    <stop offset="50%" style={{ stopColor: '#7c5cff', stopOpacity: 0.5 }} />
+                    <stop offset="100%" style={{ stopColor: '#4cc9f0', stopOpacity: 0.7 }} />
+                  </linearGradient>
+                </defs>
+                <path d="M20 30 Q10 20, 10 30 Q10 40, 20 30" fill="url(#fishGradient2)" />
+                <ellipse cx="35" cy="30" rx="25" ry="15" fill="url(#fishGradient2)" />
+                <path d="M60 30 L75 25 L75 30 L75 35 Z" fill="url(#fishGradient2)" />
+                <circle cx="45" cy="28" r="3" fill="#7c5cff" opacity="0.9" />
+              </svg>
+            </div>
+            <div className="fish fish-3">
+              <svg viewBox="0 0 100 60" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="fishGradient3" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" style={{ stopColor: '#7c5cff', stopOpacity: 0.6 }} />
+                    <stop offset="100%" style={{ stopColor: '#4cc9f0', stopOpacity: 0.6 }} />
+                  </linearGradient>
+                </defs>
+                <path d="M20 30 Q10 20, 10 30 Q10 40, 20 30" fill="url(#fishGradient3)" />
+                <ellipse cx="35" cy="30" rx="25" ry="15" fill="url(#fishGradient3)" />
+                <path d="M60 30 L75 25 L75 30 L75 35 Z" fill="url(#fishGradient3)" />
+                <circle cx="45" cy="28" r="2.5" fill="#4cc9f0" opacity="0.8" />
+              </svg>
+            </div>
+            <div className="fish fish-4">
+              <svg viewBox="0 0 100 60" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="fishGradient4" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" style={{ stopColor: '#4cc9f0', stopOpacity: 0.6 }} />
+                    <stop offset="100%" style={{ stopColor: '#7c5cff', stopOpacity: 0.6 }} />
+                  </linearGradient>
+                </defs>
+                <path d="M20 30 Q10 20, 10 30 Q10 40, 20 30" fill="url(#fishGradient4)" />
+                <ellipse cx="35" cy="30" rx="25" ry="15" fill="url(#fishGradient4)" />
+                <path d="M60 30 L75 25 L75 30 L75 35 Z" fill="url(#fishGradient4)" />
+                <circle cx="45" cy="28" r="3" fill="#7c5cff" opacity="0.8" />
+              </svg>
+            </div>
+            <div className="fish fish-5">
+              <svg viewBox="0 0 100 60" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="fishGradient5" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" style={{ stopColor: '#7c5cff', stopOpacity: 0.5 }} />
+                    <stop offset="100%" style={{ stopColor: '#4cc9f0', stopOpacity: 0.5 }} />
+                  </linearGradient>
+                </defs>
+                <path d="M20 30 Q10 20, 10 30 Q10 40, 20 30" fill="url(#fishGradient5)" />
+                <ellipse cx="35" cy="30" rx="25" ry="15" fill="url(#fishGradient5)" />
+                <path d="M60 30 L75 25 L75 30 L75 35 Z" fill="url(#fishGradient5)" />
+                <circle cx="45" cy="28" r="2.5" fill="#4cc9f0" opacity="0.7" />
+              </svg>
+            </div>
+            <div className="fish fish-6">
+              <svg viewBox="0 0 100 60" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="fishGradient6" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" style={{ stopColor: '#4cc9f0', stopOpacity: 0.5 }} />
+                    <stop offset="100%" style={{ stopColor: '#7c5cff', stopOpacity: 0.5 }} />
+                  </linearGradient>
+                </defs>
+                <path d="M20 30 Q10 20, 10 30 Q10 40, 20 30" fill="url(#fishGradient6)" />
+                <ellipse cx="35" cy="30" rx="25" ry="15" fill="url(#fishGradient6)" />
+                <path d="M60 30 L75 25 L75 30 L75 35 Z" fill="url(#fishGradient6)" />
+                <circle cx="45" cy="28" r="3" fill="#7c5cff" opacity="0.7" />
+              </svg>
+            </div>
+            <div className="fish fish-7">
+              <svg viewBox="0 0 100 60" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="fishGradient7" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" style={{ stopColor: '#7c5cff', stopOpacity: 0.4 }} />
+                    <stop offset="100%" style={{ stopColor: '#4cc9f0', stopOpacity: 0.4 }} />
+                  </linearGradient>
+                </defs>
+                <path d="M20 30 Q10 20, 10 30 Q10 40, 20 30" fill="url(#fishGradient7)" />
+                <ellipse cx="35" cy="30" rx="25" ry="15" fill="url(#fishGradient7)" />
+                <path d="M60 30 L75 25 L75 30 L75 35 Z" fill="url(#fishGradient7)" />
+                <circle cx="45" cy="28" r="2" fill="#4cc9f0" opacity="0.6" />
+              </svg>
+            </div>
+            <div className="fish fish-8">
+              <svg viewBox="0 0 100 60" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="fishGradient8" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" style={{ stopColor: '#4cc9f0', stopOpacity: 0.5 }} />
+                    <stop offset="100%" style={{ stopColor: '#7c5cff', stopOpacity: 0.5 }} />
+                  </linearGradient>
+                </defs>
+                <path d="M20 30 Q10 20, 10 30 Q10 40, 20 30" fill="url(#fishGradient8)" />
+                <ellipse cx="35" cy="30" rx="25" ry="15" fill="url(#fishGradient8)" />
+                <path d="M60 30 L75 25 L75 30 L75 35 Z" fill="url(#fishGradient8)" />
+                <circle cx="45" cy="28" r="3" fill="#7c5cff" opacity="0.7" />
+              </svg>
+            </div>
+          </div>
+        )}
         {message && (
           <div
             className={`fixed top-5 right-5 z-[10000] rounded-lg border px-5 py-4 ${message.type === 'success'
-                ? 'border-[#c3e6cb] bg-[#d4edda] text-[#155724]'
-                : 'border-[#f5c6cb] bg-[#f8d7da] text-[#721c24]'
+              ? 'border-[#c3e6cb] bg-[#d4edda] text-[#155724]'
+              : 'border-[#f5c6cb] bg-[#f8d7da] text-[#721c24]'
               }`}
           >
             {message.text}
@@ -62,7 +195,7 @@ export default function Home() {
           </div>
         )}
 
-        <div className="w-full max-w-[800px] text-center">
+        <div className="w-full max-w-[800px] text-center relative z-10">
           <div className="mb-6 sm:mb-10 flex justify-center">
             <Image
               src="/smartfishcarelogo.png"

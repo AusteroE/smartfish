@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
 import DashboardLayout from '@/components/DashboardLayout';
+import { getProfileImageUrl } from '@/lib/upload';
 
 interface User {
     id: number;
@@ -67,19 +68,7 @@ export default function AdminDashboardPage() {
     };
 
     const getProfileImageSrc = (profileImage: string) => {
-        if (!profileImage) {
-            return '/frontend/img/default profile.png';
-        }
-        if (profileImage.startsWith('/')) {
-            return profileImage;
-        }
-        if (profileImage.startsWith('uploads/')) {
-            return `/${profileImage}`;
-        }
-        if (profileImage.startsWith('frontend/')) {
-            return `/${profileImage}`;
-        }
-        return `/frontend/img/${profileImage}`;
+        return getProfileImageUrl(profileImage);
     };
 
     const formatDate = (dateString: string) => {

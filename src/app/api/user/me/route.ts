@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
                 username: true,
                 email: true,
                 profileImage: true,
+                phoneNumber: true,
                 role: true,
             },
         });
@@ -35,6 +36,7 @@ export async function GET(request: NextRequest) {
                 username: userData.username,
                 email: userData.email,
                 profile_image: userData.profileImage,
+                phone_number: userData.phoneNumber,
                 role: userData.role,
             },
         });

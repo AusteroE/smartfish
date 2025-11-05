@@ -12,7 +12,11 @@
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "start:all": "node scripts/start-all.js",
-    "dev:all": "node scripts/start-all.js"
+    "dev:all": "node scripts/start-all.js",
+    "apk:build": "node scripts/build-apk.js debug",
+    "apk:build-release": "node scripts/build-apk.js release",
+    "apk:init": "bubblewrap init --manifest=https://smartfishcare.site/manifest.json --config=twa-manifest.json",
+    "apk:update": "bubblewrap update"
   },
   "dependencies": {
     "@prisma/client": "^6.18.0",
