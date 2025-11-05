@@ -136,13 +136,13 @@ export default function Sidebar({ user, onSettingsClick, isMobileOpen = false, o
                         })}
                         <li className="pt-2 mt-2 border-t border-white/8">
                             <Link
-                                href="/dashboard/settings"
+                                href={isAdminRoute ? '/admin/settings' : '/dashboard/settings'}
                                 onClick={() => {
                                     if (onMobileClose) {
                                         onMobileClose();
                                     }
                                 }}
-                                className={`flex items-center px-4 py-3 rounded-xl transition-all duration-300 font-medium text-sm whitespace-nowrap ${pathname === '/dashboard/settings'
+                                className={`flex items-center px-4 py-3 rounded-xl transition-all duration-300 font-medium text-sm whitespace-nowrap ${(isAdminRoute ? pathname === '/admin/settings' : pathname === '/dashboard/settings')
                                     ? 'bg-[#7c5cff]/30 border border-[#7c5cff]/50 text-white shadow-[0_2px_8px_rgba(124,92,255,0.3)]'
                                     : 'text-[#e6e9ef] hover:bg-[#7c5cff]/20 hover:border hover:border-[#7c5cff]/35'
                                     }`}

@@ -84,7 +84,7 @@ export default function AdminDashboardPage() {
         <DashboardLayout>
             <div className="min-h-screen w-full">
                 {/* Header */}
-                <header className="text-center mb-6 sm:mb-8">
+                <header className="mb-6 sm:mb-8">
                     <h1 className="text-2xl sm:text-3xl font-extrabold text-[#e6e9ef] mb-2">Admin Dashboard</h1>
                     <p className="text-sm sm:text-base text-[#a2a8b6]">Manage users and monitor system activity</p>
                 </header>
@@ -129,7 +129,7 @@ export default function AdminDashboardPage() {
                 </div>
 
                 {/* Users Table */}
-                <div className="bg-gradient-to-b from-white/6 to-white/2 border border-white/8 rounded-xl p-5 backdrop-blur-sm shadow-[0_10px_30px_rgba(0,0,0,0.35)] w-full max-w-6xl mx-auto">
+                <div className="bg-gradient-to-b from-white/6 to-white/2 border border-white/8 rounded-xl p-5 backdrop-blur-sm shadow-[0_10px_30px_rgba(0,0,0,0.35)] w-full">
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-5 gap-4">
                         <h2 className="text-xl font-bold text-[#e6e9ef]">User List</h2>
                         <div className="flex gap-2 w-full sm:w-auto">

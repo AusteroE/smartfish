@@ -101,14 +101,14 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
             {/* Fixed Sidebar - Desktop only */}
             <Sidebar
                 user={user}
-                onSettingsClick={() => router.push('/dashboard/settings')}
+                onSettingsClick={() => router.push(pathname?.startsWith('/admin') ? '/admin/settings' : '/dashboard/settings')}
                 isMobileOpen={sidebarOpen}
                 onMobileClose={() => setSidebarOpen(false)}
             />
 
             {/* Main Content */}
-            <main className="flex-1 md:ml-[280px] p-4 sm:p-6 md:p-10 bg-transparent min-h-screen pb-32 md:pb-10">
-                <div className="max-w-7xl mx-auto">
+            <main className="flex-1 p-4 sm:p-6 md:p-10 md:pl-[280px] bg-transparent min-h-screen pb-32 md:pb-10">
+                <div className={`${pathname?.startsWith('/admin') ? 'w-full' : 'max-w-7xl mx-auto'}`}>
                     {children}
                 </div>
             </main>
@@ -133,8 +133,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
                         );
                     })}
                     <Link
-                        href="/dashboard/settings"
-                        className={`flex flex-col items-center justify-center p-2 rounded-xl min-w-[60px] min-h-[60px] transition-all duration-300 ${pathname === '/dashboard/settings' ? 'text-[#7c5cff] bg-[#7c5cff]/20' : 'text-white/50 hover:text-white/70'}`}
+                        href={pathname?.startsWith('/admin') ? '/admin/settings' : '/dashboard/settings'}
+                        className={`flex flex-col items-center justify-center p-2 rounded-xl min-w-[60px] min-h-[60px] transition-all duration-300 ${(pathname?.startsWith('/admin') ? pathname === '/admin/settings' : pathname === '/dashboard/settings') ? 'text-[#7c5cff] bg-[#7c5cff]/20' : 'text-white/50 hover:text-white/70'}`}
                     >
                         <i className="fas fa-cog text-xl mb-1"></i>
                         <span className="text-[10px] font-medium">Settings</span>
