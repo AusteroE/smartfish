@@ -64,7 +64,8 @@ session.headers.update({
 })
 
 # Use Next.js API endpoint (change to your server URL if deploying)
-url = "http://localhost:3000/api/iot-data"
+# url = "http://localhost:3000/api/iot-data"
+url = "https://smartfishcare.site/api/iot-data"
 
 # OPTIONAL: Specify Arduino port manually (e.g., 'COM3', 'COM4', '/dev/ttyUSB0')
 # Leave as None to auto-detect

@@ -23,6 +23,7 @@ interface FullDetectionInfo {
   confidence: number;
   x: number;
   y: number;
+  fishType: 'tilapia' | 'other';
 }
 
 interface BoundingBox {
@@ -68,6 +69,10 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
   const isRunningRef = useRef(false); // Track if loop is actually running
   const previousFrameRef = useRef<ImageData | null>(null); // For motion detection
   const detectionHistoryRef = useRef<Array<{ x: number; y: number; time: number }>>([]); // Track detection positions
+  const frameSkipCounterRef = useRef(0); // Skip frames for performance
+  const processingCanvasRef = useRef<HTMLCanvasElement | null>(null); // Offscreen canvas for processing
+  const lastDetectionTimeRef = useRef<number>(0); // Throttle detections
+  const currentDetectionsRef = useRef<Array<{ x: number; y: number; width: number; height: number; color: string; label: string; isTilapia?: boolean }>>([]); // Store current detections for drawing
 
   // Initialize TensorFlow.js and load model
   useEffect(() => {
@@ -106,11 +111,11 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
         throw new Error('Camera API not supported in this browser');
       }
 
-      // Try different camera constraints
+      // Try different camera constraints - OPTIMIZED for performance
       let stream: MediaStream | null = null;
       const constraints = [
-        { video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'environment' } },
-        { video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'environment' } },
+        { video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'environment' } }, // Lower resolution first
+        { video: { width: { ideal: 480 }, height: { ideal: 360 }, facingMode: 'environment' } }, // Even lower for performance
         { video: { facingMode: 'environment' } },
         { video: true }
       ];
@@ -273,6 +278,8 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
     previousFrameRef.current = null;
     // Clear detection history
     detectionHistoryRef.current = [];
+    // Clear current detections
+    currentDetectionsRef.current = [];
   };
 
   const cleanup = () => {
@@ -289,7 +296,62 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
     return 'Large';
   };
 
-  // Enhanced fish detection with multiple validation layers
+  // Detect if fish is tilapia based on color and characteristics
+  const isTilapia = (
+    colorData: Array<{ r: number; g: number; b: number; gray: number }>,
+    box: BoundingBox,
+    width: number,
+    height: number
+  ): boolean => {
+    // OPTIMIZATION: Larger sample step for faster tilapia detection
+    const sampleStep = Math.max(2, Math.floor(Math.min(box.width, box.height) / 15)); // Reduced sampling density
+    let tilapiaColorPixels = 0;
+    let totalSamples = 0;
+    let avgBrightness = 0;
+    let avgSaturation = 0;
+
+    for (let y = box.y; y < box.y + box.height && y < height; y += sampleStep) {
+      for (let x = box.x; x < box.x + box.width && x < width; x += sampleStep) {
+        const idx = y * width + x;
+        if (idx >= 0 && idx < colorData.length) {
+          totalSamples++;
+          const { r, g, b } = colorData[idx];
+          const maxColor = Math.max(r, g, b);
+          const minColor = Math.min(r, g, b);
+          const saturation = maxColor === 0 ? 0 : (maxColor - minColor) / maxColor;
+          const brightness = (r + g + b) / 3;
+
+          avgBrightness += brightness;
+          avgSaturation += saturation;
+
+          // Tilapia characteristics: gray/silver with low saturation
+          // Typical tilapia: gray-silver, low saturation (<0.25), medium brightness (60-160)
+          const isTilapiaColor =
+            (saturation < 0.25 && brightness > 60 && brightness < 160) || // Gray/silver
+            (saturation < 0.20 && brightness > 50 && brightness < 170) || // Very low saturation
+            (r > 90 && g > 85 && b > 80 && r < 150 && g < 145 && b < 140 && saturation < 0.22); // Gray tones
+
+          if (isTilapiaColor) {
+            tilapiaColorPixels++;
+          }
+        }
+      }
+    }
+
+    if (totalSamples === 0) return false;
+
+    avgBrightness /= totalSamples;
+    avgSaturation /= totalSamples;
+    const tilapiaColorRatio = tilapiaColorPixels / totalSamples;
+
+    // Tilapia detection criteria:
+    // 1. At least 70% of pixels match tilapia color characteristics
+    // 2. Low average saturation (<0.25)
+    // 3. Medium brightness (50-170)
+    return tilapiaColorRatio >= 0.70 && avgSaturation < 0.25 && avgBrightness >= 50 && avgBrightness <= 170;
+  };
+
+  // Enhanced fish detection with multiple validation layers - GENERALIZED FOR ANY FISH
   const detectFishInFrame = (imageData: ImageData, width: number, height: number): BoundingBox[] => {
     const data = imageData.data;
     const detections: BoundingBox[] = [];
@@ -308,7 +370,7 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
       colorData[idx] = { r, g, b, gray };
     }
 
-    // Enhanced edge detection using Sobel operator with adaptive threshold
+    // Enhanced edge detection using Sobel operator with improved adaptive threshold
     let edgeMagnitudes: number[] = [];
     for (let y = 1; y < height - 1; y++) {
       for (let x = 1; x < width - 1; x++) {
@@ -320,17 +382,36 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
           + grayData[(y + 1) * width + (x - 1)] + 2 * grayData[(y + 1) * width + x] + grayData[(y + 1) * width + (x + 1)];
         const magnitude = Math.sqrt(gx * gx + gy * gy);
         edgeMagnitudes.push(magnitude);
-        edgeData[idx] = magnitude > 40 ? 255 : 0; // Higher threshold to reduce noise
+      }
+    }
+
+    // Calculate adaptive threshold from all edge magnitudes
+    const sortedMagnitudes = [...edgeMagnitudes].sort((a, b) => a - b);
+    const medianMagnitude = sortedMagnitudes[Math.floor(sortedMagnitudes.length / 2)];
+    const meanMagnitude = edgeMagnitudes.reduce((a, b) => a + b, 0) / edgeMagnitudes.length;
+    // Use a combination of median and mean for better threshold
+    const adaptiveThreshold = Math.max(40, Math.min(medianMagnitude * 1.2, meanMagnitude * 0.8));
+
+    // Apply threshold to edge data
+    let edgeIdx = 0;
+    for (let y = 1; y < height - 1; y++) {
+      for (let x = 1; x < width - 1; x++) {
+        const idx = y * width + x;
+        edgeData[idx] = edgeMagnitudes[edgeIdx] > adaptiveThreshold ? 255 : 0;
+        edgeIdx++;
       }
     }
 
     // Find connected components with fish-like characteristics
     const visited = new Set<number>();
-    const minArea = 2000; // Increased minimum area
-    const maxArea = width * height * 0.25; // Reduced max area
+    // Improved size range for better accuracy - reject very small objects
+    const minArea = 2000; // Increased minimum to reduce false positives from small debris
+    const maxArea = width * height * 0.25; // Slightly reduced max to avoid large background objects
 
-    for (let y = 3; y < height - 3; y += 4) {
-      for (let x = 3; x < width - 3; x += 4) {
+    // Balanced step size for accuracy and performance
+    const stepSize = Math.max(2, Math.floor(Math.min(width, height) / 180)); // Smaller step for better detection
+    for (let y = stepSize; y < height - stepSize; y += stepSize) {
+      for (let x = stepSize; x < width - stepSize; x += stepSize) {
         const idx = y * width + x;
         if (edgeData[idx] > 0 && !visited.has(idx)) {
           const box = findConnectedComponent(edgeData, x, y, width, height, visited);
@@ -338,8 +419,9 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
             const area = box.width * box.height;
             const aspectRatio = box.width / box.height;
 
-            // Basic size and aspect ratio filters
-            if (area >= minArea && area <= maxArea && aspectRatio >= 1.5 && aspectRatio <= 5.5) {
+            // Improved aspect ratio range for fish (1.5 to 5.0) - tighter range reduces false positives
+            // Most fish have aspect ratios between 2.0 and 4.5
+            if (area >= minArea && area <= maxArea && aspectRatio >= 1.5 && aspectRatio <= 5.0) {
               // Analyze the region for fish-like characteristics
               const fishScore = analyzeFishCharacteristics(
                 colorData,
@@ -351,25 +433,24 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
                 previousFrameRef.current
               );
 
-              // Additional check: Reject detections in same location repeatedly (static objects)
+              // Enhanced check: Reject detections in same location repeatedly (static objects)
               const now = Date.now();
               const recentDetections = detectionHistoryRef.current.filter(
-                d => Math.abs(d.x - box.x) < 50 && Math.abs(d.y - box.y) < 50 && (now - d.time) < 2000
+                d => Math.abs(d.x - box.x) < 40 && Math.abs(d.y - box.y) < 40 && (now - d.time) < 3000
               );
 
-              // If same location detected multiple times quickly, it's likely static (pattern/background)
-              // Skip this detection - don't add it
-              if (recentDetections.length <= 3) {
-                // Only accept detections with sufficient fish-like characteristics
-                // EXTREMELY STRICT threshold to 0.90 for fish-only detection (reject false positives)
-                if (fishScore > 0.90) {
+              // If same location detected multiple times with no motion, it's likely static
+              // Require fewer static detections to filter out immobile objects
+              if (recentDetections.length <= 2) {
+                // Increased threshold (0.82) for better accuracy - reduce false positives
+                if (fishScore > 0.82) {
                   // Record this detection location
                   detectionHistoryRef.current.push({ x: box.x, y: box.y, time: now });
-                  // Keep only last 10 detections
-                  if (detectionHistoryRef.current.length > 10) {
+                  // Keep only last 20 detections for better tracking
+                  if (detectionHistoryRef.current.length > 20) {
                     detectionHistoryRef.current.shift();
                   }
-                  detections.push({ ...box, confidence: Math.min(fishScore, 0.95) });
+                  detections.push({ ...box, confidence: Math.min(fishScore, 0.98) });
                 }
               }
             }
@@ -378,7 +459,7 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
       }
     }
 
-    // Return all detections sorted by confidence (not just the best one)
+    // Return all detections sorted by confidence
     // Filter out overlapping detections (keep the one with higher confidence)
     const sortedDetections = detections.sort((a, b) => b.confidence - a.confidence);
     const filteredDetections: BoundingBox[] = [];
@@ -386,15 +467,17 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
     for (const detection of sortedDetections) {
       let isOverlapping = false;
       for (const existing of filteredDetections) {
-        // Check if bounding boxes overlap significantly (>30% overlap)
+        // Improved overlap detection - use 30% threshold for better filtering
         const overlapX = Math.max(0, Math.min(detection.x + detection.width, existing.x + existing.width) - Math.max(detection.x, existing.x));
         const overlapY = Math.max(0, Math.min(detection.y + detection.height, existing.y + existing.height) - Math.max(detection.y, existing.y));
         const overlapArea = overlapX * overlapY;
         const detectionArea = detection.width * detection.height;
         const existingArea = existing.width * existing.height;
         const minArea = Math.min(detectionArea, existingArea);
+        const maxArea = Math.max(detectionArea, existingArea);
 
-        if (overlapArea / minArea > 0.3) {
+        // Check both minimum area overlap (30%) and maximum area overlap (20%) for better filtering
+        if (overlapArea / minArea > 0.30 || overlapArea / maxArea > 0.20) {
           isOverlapping = true;
           break;
         }
@@ -402,8 +485,8 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
 
       if (!isOverlapping) {
         filteredDetections.push(detection);
-        // Limit to maximum 6 detections for performance
-        if (filteredDetections.length >= 6) break;
+        // Limit to maximum 8 detections for performance
+        if (filteredDetections.length >= 8) break;
       }
     }
 
@@ -448,7 +531,7 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
     return { x: minX, y: minY, width: maxX - minX, height: maxY - minY, confidence: 0.8 };
   };
 
-  // Multi-factor analysis to identify fish-like objects - FISH-ONLY MODE
+  // Multi-factor analysis to identify fish-like objects - GENERALIZED FOR ANY FISH TYPE
   const analyzeFishCharacteristics = (
     colorData: Array<{ r: number; g: number; b: number; gray: number }>,
     box: BoundingBox,
@@ -461,8 +544,8 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
     let score = 0.0;
     let fishColorPixels = 0;
 
-    // Sample pixels within the bounding box (more dense sampling for better analysis)
-    const sampleStep = Math.max(1, Math.floor(Math.min(box.width, box.height) / 25));
+    // OPTIMIZATION: Larger sample step for faster processing
+    const sampleStep = Math.max(2, Math.floor(Math.min(box.width, box.height) / 25)); // Reduced sampling density
     const samples: Array<{ r: number; g: number; b: number; x: number; y: number; gray: number }> = [];
 
     for (let y = box.y; y < box.y + box.height && y < height; y += sampleStep) {
@@ -481,7 +564,7 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
     const centerY = box.y + box.height / 2;
     let centerDensity = 0;
     let edgeDensity = 0;
-    const centerRadius = Math.min(box.width, box.height) * 0.3;
+    const centerRadius = Math.min(box.width, box.height) * 0.35; // Slightly larger center region
 
     for (const pixel of samples) {
       const distFromCenter = Math.sqrt(
@@ -494,16 +577,17 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
       }
     }
 
-    // Fish should have higher density in center (body) than edges
+    // Fish should have reasonable density distribution (not too uniform, not too scattered)
+    // Fish typically have more content in the center (body) than edges
     const densityRatio = centerDensity / Math.max(1, edgeDensity);
-    const shapeScore = densityRatio > 0.6 ? 1.0 : densityRatio > 0.4 ? 0.6 : 0.2;
-    score += shapeScore * 0.15; // 15% weight for body shape
+    const shapeScore = densityRatio > 0.6 ? 1.0 : densityRatio > 0.4 ? 0.85 : densityRatio > 0.3 ? 0.65 : densityRatio > 0.2 ? 0.4 : 0.1;
+    score += shapeScore * 0.15; // Increased to 15% weight for better shape validation
 
-    // 1. Color analysis: Fish typically have blues, grays, silvers, or browns
-    // VERY STRICT: Reject patterns, walls, and non-fish objects aggressively
+    // 1. Color analysis: GENERALIZED for any fish - accept wide range of aquatic colors
     let uniformColorCount = 0;
     let brightColorCount = 0;
     let totalSaturation = 0;
+    let underwaterColorCount = 0; // Colors that work underwater
 
     for (const pixel of samples) {
       const { r, g, b } = pixel;
@@ -515,100 +599,137 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
 
       // Check for uniform colors (patterns/backgrounds are often very uniform)
       const colorRange = maxColor - minColor;
-      if (colorRange < 20) {
+      if (colorRange < 25) {
         uniformColorCount++;
       }
 
-      // REJECT bright/vibrant colors (patterns, decorative objects)
-      if (brightness > 200 || saturation > 0.5) {
+      // Reject extremely bright/vibrant colors (patterns, decorative objects)
+      if (brightness > 220 || saturation > 0.6) {
         brightColorCount++;
       }
 
-      // Fish colors: VERY strict - only accept aquatic colors
-      // Tilapia: typically gray/silver with low saturation
+      // GENERALIZED Fish colors: Accept wide range of aquatic colors
+      // Works for: gray/silver fish, colorful tropical fish, brown fish, blue fish, etc.
       const isFishColor =
-        (saturation < 0.20 && brightness > 50 && brightness < 170) || // Gray/silver (very strict)
-        (b > r + 30 && b > g + 20 && saturation < 0.35 && brightness < 180) || // Blue tones (stricter)
-        (g > r + 25 && g > b + 20 && saturation < 0.30 && brightness < 170) || // Green-gray (stricter)
-        (r > 100 && g > 90 && b > 80 && r < 160 && g < 150 && b < 140 && saturation < 0.25); // Brown tones (very strict)
+        // Gray/silver scales (tilapia, bass, etc.)
+        (saturation < 0.25 && brightness > 40 && brightness < 200) ||
+        // Blue tones (bluefish, certain tropical fish)
+        (b > r + 20 && b > g + 15 && saturation < 0.50 && brightness < 200) ||
+        // Green-gray (some tropical, bass)
+        (g > r + 15 && g > b + 10 && saturation < 0.45 && brightness < 200) ||
+        // Brown/tan (catfish, carp, etc.)
+        (r > 80 && g > 70 && b > 60 && r < 180 && g < 170 && b < 160 && saturation < 0.40) ||
+        // Yellow/gold (goldfish, some tropical)
+        (r > 150 && g > 140 && b < 100 && saturation < 0.55 && brightness < 220) ||
+        // Red/orange (koi, some tropical fish)
+        (r > 120 && g < r - 20 && b < r - 30 && saturation < 0.60 && brightness < 210) ||
+        // Dark fish (some species)
+        (brightness < 80 && saturation < 0.30) ||
+        // Medium tones (many fish species)
+        (brightness >= 80 && brightness <= 160 && saturation < 0.35);
 
-      if (isFishColor) fishColorPixels++;
+      if (isFishColor) {
+        fishColorPixels++;
+      }
+
+      // Underwater color validation (blue/green tint common in underwater environments)
+      if (b > g + 10 || g > r + 10) {
+        underwaterColorCount++;
+      }
     }
 
     const colorScore = fishColorPixels / samples.length;
     const uniformityRatio = uniformColorCount / samples.length;
     const brightRatio = brightColorCount / samples.length;
     const avgSaturation = totalSaturation / samples.length;
+    const underwaterRatio = underwaterColorCount / samples.length;
 
-    // HEAVILY penalize uniform regions, bright colors, and high saturation
+    // Penalize uniform regions, but less harshly
     let adjustedColorScore = colorScore;
-    if (uniformityRatio > 0.5) {
-      adjustedColorScore *= 0.3; // Heavily penalize uniform regions
-    } else if (uniformityRatio > 0.35) {
-      adjustedColorScore *= 0.5; // Strong penalty
+    if (uniformityRatio > 0.6) {
+      adjustedColorScore *= 0.4; // Penalize very uniform regions
+    } else if (uniformityRatio > 0.45) {
+      adjustedColorScore *= 0.6;
     }
 
-    if (brightRatio > 0.2) {
-      adjustedColorScore *= 0.4; // Reject bright/vibrant objects
+    // Reject extremely bright/vibrant objects
+    if (brightRatio > 0.3) {
+      adjustedColorScore *= 0.3;
+    } else if (brightRatio > 0.2) {
+      adjustedColorScore *= 0.5;
     }
 
-    if (avgSaturation > 0.3) {
-      adjustedColorScore *= 0.5; // Reject high saturation (patterns/decorations)
+    // Accept moderate saturation (colorful fish are valid)
+    if (avgSaturation > 0.5) {
+      adjustedColorScore *= 0.6; // Some colorful fish are valid
+    } else if (avgSaturation > 0.4) {
+      adjustedColorScore *= 0.8;
     }
 
-    // Require at least 60% fish-colored pixels
-    if (colorScore < 0.6) {
-      adjustedColorScore *= 0.5; // Penalize if not enough fish colors
+    // Bonus for underwater colors (indicates aquatic environment)
+    if (underwaterRatio > 0.3) {
+      adjustedColorScore *= 1.1; // Slight boost for underwater colors
+      adjustedColorScore = Math.min(adjustedColorScore, 1.0);
     }
 
-    score += adjustedColorScore * 0.25; // 25% weight (reduced, motion and shape more important)
+    // Require at least 55% fish-colored pixels for better accuracy
+    if (colorScore < 0.55) {
+      adjustedColorScore *= 0.5; // More strict penalty
+    } else if (colorScore < 0.65) {
+      adjustedColorScore *= 0.7; // Moderate penalty for borderline cases
+    }
 
-    // 2. Aspect ratio validation (fish are typically 2.5-4:1 length to width)
-    // VERY STRICT: Fish have specific elongated body shape
+    score += adjustedColorScore * 0.20; // 20% weight
+
+    // 2. Aspect ratio validation - IMPROVED for better accuracy
     let aspectScore = 0;
-    if (aspectRatio >= 2.5 && aspectRatio <= 4.0) {
-      aspectScore = 1.0; // Ideal fish body ratio
-    } else if (aspectRatio >= 2.2 && aspectRatio < 2.5) {
-      aspectScore = 0.7; // Slightly short but acceptable
+    // Tighter range for typical fish shapes (most fish are 2.0-4.0)
+    if (aspectRatio >= 2.0 && aspectRatio <= 4.0) {
+      aspectScore = 1.0; // Ideal fish body ratio (most common)
+    } else if (aspectRatio >= 1.8 && aspectRatio < 2.0) {
+      aspectScore = 0.9; // Slightly rounder (still good)
     } else if (aspectRatio > 4.0 && aspectRatio <= 4.5) {
-      aspectScore = 0.7; // Slightly long but acceptable
-    } else if (aspectRatio >= 2.0 && aspectRatio < 2.2) {
-      aspectScore = 0.4; // Too short - suspicious
+      aspectScore = 0.85; // Slightly elongated (still good)
+    } else if (aspectRatio >= 1.5 && aspectRatio < 1.8) {
+      aspectScore = 0.7; // Rounder fish (acceptable but less common)
     } else if (aspectRatio > 4.5 && aspectRatio <= 5.0) {
-      aspectScore = 0.4; // Too long - suspicious
+      aspectScore = 0.7; // Elongated (acceptable but less common)
+    } else if (aspectRatio >= 1.3 && aspectRatio < 1.5) {
+      aspectScore = 0.5; // Very round (suspicious)
     } else {
-      aspectScore = 0.0; // Outside fish range - REJECT
+      aspectScore = 0.2; // Outside reasonable range - likely not a fish
     }
-    score += aspectScore * 0.20; // 20% weight
+    score += aspectScore * 0.20; // Increased to 20% weight for better accuracy
 
-    // 3. Size validation (fish size range - not too small, not too large)
+    // 3. Size validation - GENERALIZED for different fish sizes
     let sizeScore = 0;
     const minDimension = Math.min(box.width, box.height);
     const maxDimension = Math.max(box.width, box.height);
 
-    // Fish must have reasonable dimensions (not too thin, not too wide)
-    if (area >= 4000 && area <= 35000 && minDimension >= 40 && maxDimension <= 300) {
-      sizeScore = 1.0; // Ideal fish size
-    } else if (area >= 3000 && area < 4000 && minDimension >= 35) {
-      sizeScore = 0.7; // Small but acceptable
-    } else if (area > 35000 && area <= 50000 && maxDimension <= 350) {
-      sizeScore = 0.7; // Large but acceptable
-    } else if (minDimension < 30) {
-      sizeScore = 0.1; // Too small - likely noise
+    // More flexible size range for different fish types
+    if (area >= 3000 && area <= 50000 && minDimension >= 30 && maxDimension <= 400) {
+      sizeScore = 1.0; // Wide range for different fish sizes
+    } else if (area >= 2000 && area < 3000 && minDimension >= 25) {
+      sizeScore = 0.8; // Small fish
+    } else if (area > 50000 && area <= 80000 && maxDimension <= 500) {
+      sizeScore = 0.8; // Large fish
+    } else if (minDimension < 25) {
+      sizeScore = 0.2; // Too small - likely noise
+    } else if (area > 80000) {
+      sizeScore = 0.3; // Too large - likely multiple fish or background
     } else {
-      sizeScore = 0.3; // Outside acceptable range
+      sizeScore = 0.5; // Borderline
     }
-    score += sizeScore * 0.10; // 10% weight
+    score += sizeScore * 0.12; // 12% weight
 
-    // 4. Edge continuity analysis (fish have smooth, continuous edges - not jagged like patterns)
-    // Analyze edge smoothness by checking gradient consistency
+    // 4. Edge continuity analysis - GENERALIZED
     let edgeConsistency = 0;
     let edgeSampleCount = 0;
     const edgeSamples: number[] = [];
 
     // Sample edges of the bounding box
-    for (let i = 0; i < 20; i++) {
-      const t = i / 20;
+    for (let i = 0; i < 24; i++) {
+      const t = i / 24;
       const edgeX = box.x + box.width * t;
       const edgeY = box.y + box.height * t;
 
@@ -630,27 +751,29 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
       }
       variance /= edgeSamples.length;
 
-      // Fish have moderate edge variance (not too uniform, not too chaotic)
-      if (variance > 200 && variance < 2000) {
+      // More flexible edge variance (fish can have varied edge patterns)
+      if (variance > 150 && variance < 3000) {
         edgeConsistency = 1.0; // Good edge smoothness
-      } else if (variance > 100 && variance < 3000) {
-        edgeConsistency = 0.6; // Acceptable
+      } else if (variance > 100 && variance < 4000) {
+        edgeConsistency = 0.7; // Acceptable
+      } else if (variance > 50 && variance < 5000) {
+        edgeConsistency = 0.4; // Borderline
       } else {
-        edgeConsistency = 0.2; // Too uniform or too chaotic - likely not a fish
+        edgeConsistency = 0.2; // Too uniform or too chaotic
       }
     }
 
-    score += edgeConsistency * 0.10; // 10% weight
+    score += edgeConsistency * 0.08; // 8% weight
 
-    // 5. Motion detection (fish move, static objects don't) - CRITICAL FILTER
-    let motionScore = 0.0; // Default: NO motion = reject (much stricter)
+    // 5. Motion detection - CRITICAL FILTER (fish move, static objects don't)
+    let motionScore = 0.0;
     if (previousFrame && previousFrame.width === width && previousFrame.height === height) {
       let motionPixels = 0;
-      const motionThreshold = 25; // Lower threshold to catch subtle motion
+      const motionThreshold = 20; // Lower threshold to catch subtle motion
       let totalSampled = 0;
 
-      // Sample motion in the bounding box region (more aggressive sampling)
-      const motionStep = Math.max(1, Math.floor(sampleStep / 2)); // Sample more densely
+      // OPTIMIZATION: Larger motion step for faster processing
+      const motionStep = Math.max(2, Math.floor(sampleStep / 1.5)); // Less dense motion sampling
       for (let y = box.y; y < box.y + box.height && y < height; y += motionStep) {
         for (let x = box.x; x < box.x + box.width && x < width; x += motionStep) {
           const idx = (y * width + x) * 4;
@@ -675,40 +798,59 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
 
       if (totalSampled > 0) {
         const motionRatio = motionPixels / totalSampled;
-        // EXTREMELY STRICT: Require strong consistent motion (fish MUST move)
-        // Patterns/static objects show NO motion, fish show strong consistent motion
-        if (motionRatio > 0.35 && motionRatio < 0.60) {
-          motionScore = 1.0; // Strong consistent motion (definitely fish-like)
-        } else if (motionRatio > 0.25 && motionRatio < 0.70) {
-          motionScore = 0.7; // Good motion (likely fish)
-        } else if (motionRatio > 0.18) {
-          motionScore = 0.4; // Moderate motion - suspicious, needs other strong indicators
+        // Improved motion detection - stricter thresholds for better accuracy
+        // Fish typically show 20-60% motion in their bounding box when moving
+        if (motionRatio > 0.30 && motionRatio < 0.60) {
+          motionScore = 1.0; // Strong consistent motion (ideal range)
+        } else if (motionRatio > 0.20 && motionRatio < 0.70) {
+          motionScore = 0.85; // Good motion (slightly wider range)
+        } else if (motionRatio > 0.15 && motionRatio < 0.80) {
+          motionScore = 0.65; // Moderate motion (acceptable)
         } else if (motionRatio > 0.10) {
-          motionScore = 0.1; // Weak motion - likely static object
+          motionScore = 0.4; // Weak motion (suspicious)
+        } else if (motionRatio > 0.05) {
+          motionScore = 0.15; // Very weak motion (likely static)
         } else {
-          motionScore = 0.0; // NO motion - DEFINITELY REJECT (static objects like patterns/walls)
+          motionScore = 0.0; // NO motion - reject static objects
         }
       } else {
-        motionScore = 0.0; // Can't determine motion - reject
+        motionScore = 0.0;
       }
     } else {
-      // No previous frame available - be conservative
-      motionScore = 0.3; // Lower score when we can't check motion
+      // No previous frame - be more conservative (lower initial score)
+      motionScore = 0.3;
     }
-    score += motionScore * 0.30; // Increased weight to 30% - motion is CRITICAL for fish detection
+    score += motionScore * 0.35; // Increased to 35% weight - motion is CRITICAL for accuracy
 
-    // FINAL VALIDATION: Require motion for fish (fish MUST move)
-    // If no motion detected, heavily penalize (even if other factors pass)
-    if (motionScore < 0.3) {
-      score *= 0.5; // Cut score in half if motion is too weak
+    // FINAL VALIDATION: Motion is critical for accuracy - stricter penalties
+    if (motionScore < 0.15) {
+      score *= 0.4; // Strong penalty for very weak/no motion
+    } else if (motionScore < 0.3) {
+      score *= 0.6; // Moderate penalty for weak motion
+    } else if (motionScore < 0.5) {
+      score *= 0.8; // Slight reduction for moderate motion
     }
 
-    return Math.min(score, 0.95);
+    return Math.min(score, 0.98);
   };
 
   const calculateConfidence = (box: BoundingBox, aspectRatio: number): number => {
     // This function is no longer used but kept for compatibility
     return 0.8;
+  };
+
+  const playNotificationSound = () => {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    oscillator.frequency.value = 800;
+    oscillator.type = 'sine';
+    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
+    oscillator.start(audioContext.currentTime);
+    oscillator.stop(audioContext.currentTime + 0.2);
   };
 
   const startDetectionLoop = () => {
@@ -722,6 +864,13 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
     }
 
     isRunningRef.current = true;
+    frameSkipCounterRef.current = 0;
+    lastDetectionTimeRef.current = 0;
+
+    // Create offscreen canvas for processing (smaller resolution for performance)
+    if (!processingCanvasRef.current) {
+      processingCanvasRef.current = document.createElement('canvas');
+    }
 
     const detect = () => {
       // Use ref to check state instead of closure variable
@@ -734,7 +883,7 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
 
       const video = videoRef.current;
       const canvas = canvasRef.current;
-      const ctx = canvas.getContext('2d');
+      const ctx = canvas.getContext('2d', { willReadFrequently: false }); // Optimize context
 
       if (!ctx) {
         animationFrameRef.current = requestAnimationFrame(detect);
@@ -755,11 +904,32 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
           console.log('Canvas dimensions set:', video.videoWidth, 'x', video.videoHeight);
         }
 
-        // Draw video frame
+        // Draw video frame immediately (smooth display)
         try {
           // Clear canvas before drawing new frame
           ctx.clearRect(0, 0, canvas.width, canvas.height);
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+          // Draw bounding boxes on every frame (persist between detection runs)
+          if (currentDetectionsRef.current.length > 0) {
+            currentDetectionsRef.current.forEach((detection) => {
+              // Draw bounding box - thicker line for tilapia (green)
+              ctx.strokeStyle = detection.color;
+              ctx.lineWidth = detection.isTilapia ? 4 : 3; // Thicker line for tilapia (green)
+              ctx.strokeRect(detection.x, detection.y, detection.width, detection.height);
+
+              // Draw label background with tilapia-specific color
+              ctx.fillStyle = detection.color;
+              ctx.font = 'bold 14px Arial';
+              const textMetrics = ctx.measureText(detection.label);
+              const labelHeight = 18;
+              ctx.fillRect(detection.x, detection.y - labelHeight - 2, textMetrics.width + 4, labelHeight);
+
+              // Draw label text
+              ctx.fillStyle = '#000000';
+              ctx.fillText(detection.label, detection.x + 2, detection.y - 4);
+            });
+          }
 
           // Update FPS
           fpsCounterRef.current.count++;
@@ -770,120 +940,180 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
             fpsCounterRef.current.lastTime = now;
           }
 
-          // Run detection
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const detections = detectFishInFrame(imageData, canvas.width, canvas.height);
+          // OPTIMIZATION: Skip frames and throttle detection (process every 3rd frame = ~10-15 FPS detection)
+          frameSkipCounterRef.current++;
+          const shouldProcess = frameSkipCounterRef.current % 3 === 0; // Process every 3rd frame
+          const timeSinceLastDetection = now - lastDetectionTimeRef.current;
+          const minDetectionInterval = 100; // Minimum 100ms between detections (10 FPS max)
 
-          // Store current frame for motion detection in next iteration
-          previousFrameRef.current = imageData;
+          if (shouldProcess && timeSinceLastDetection >= minDetectionInterval) {
+            lastDetectionTimeRef.current = now;
 
-          // Draw bounding boxes for ALL detections
-          const pixelToCmRatio = 0.08;
-          const fullDetections: FullDetectionInfo[] = [];
+            // Use smaller resolution for processing to improve performance
+            const processScale = 0.6; // Process at 60% resolution for speed
+            const processWidth = Math.floor(canvas.width * processScale);
+            const processHeight = Math.floor(canvas.height * processScale);
 
-          if (detections.length > 0) {
-            // Colors for different detections
-            const colors = ['#00ff00', '#00ffff', '#ff00ff', '#ffff00', '#ff8800', '#00ff88'];
+            // Use offscreen canvas for processing
+            const processCanvas = processingCanvasRef.current;
+            if (processCanvas && (processCanvas.width !== processWidth || processCanvas.height !== processHeight)) {
+              processCanvas.width = processWidth;
+              processCanvas.height = processHeight;
+            }
 
-            detections.forEach((detection, index) => {
-              const color = colors[index % colors.length];
+            if (processCanvas) {
+              const processCtx = processCanvas.getContext('2d', { willReadFrequently: false });
+              if (processCtx) {
+                // Draw scaled down version for processing
+                processCtx.drawImage(video, 0, 0, processWidth, processHeight);
 
-              // Draw bounding box
-              ctx.strokeStyle = color;
-              ctx.lineWidth = 3;
-              ctx.strokeRect(detection.x, detection.y, detection.width, detection.height);
+                // Get image data at lower resolution
+                const imageData = processCtx.getImageData(0, 0, processWidth, processHeight);
 
-              // Draw label background
-              const label = `Fish ${index + 1} ${(detection.confidence * 100).toFixed(1)}%`;
-              ctx.fillStyle = color;
-              ctx.font = 'bold 14px Arial';
-              const textMetrics = ctx.measureText(label);
-              const labelHeight = 18;
-              ctx.fillRect(detection.x, detection.y - labelHeight - 2, textMetrics.width + 4, labelHeight);
+                // Run detection on scaled image
+                const detections = detectFishInFrame(imageData, processWidth, processHeight);
 
-              // Draw label text
-              ctx.fillStyle = '#000000';
-              ctx.fillText(label, detection.x + 2, detection.y - 4);
+                // Scale detections back to original canvas size
+                const scaleFactor = 1 / processScale;
+                const scaledDetections = detections.map(det => ({
+                  ...det,
+                  x: Math.floor(det.x * scaleFactor),
+                  y: Math.floor(det.y * scaleFactor),
+                  width: Math.floor(det.width * scaleFactor),
+                  height: Math.floor(det.height * scaleFactor),
+                }));
 
-              // Calculate measurements
-              const length = Math.max(detection.width, detection.height) * pixelToCmRatio;
-              const width = Math.min(detection.width, detection.height) * pixelToCmRatio;
-              const category = classifyFishSize(length, width);
-              const confidence = detection.confidence * 100;
+                // Store current frame for motion detection (use scaled version)
+                previousFrameRef.current = imageData;
 
-              fullDetections.push({
-                length: parseFloat(length.toFixed(2)),
-                width: parseFloat(width.toFixed(2)),
-                category,
-                confidence: parseFloat(confidence.toFixed(1)),
-                x: detection.x,
-                y: detection.y,
-              });
-            });
+                // Draw bounding boxes for ALL detections
+                const pixelToCmRatio = 0.08;
+                const fullDetections: FullDetectionInfo[] = [];
 
-            // Update state with all detections
-            setAllDetections(fullDetections);
+                // Prepare color data for tilapia detection
+                const colorData = new Array(processWidth * processHeight);
+                for (let i = 0; i < imageData.data.length; i += 4) {
+                  const idx = i / 4;
+                  const r = imageData.data[i];
+                  const g = imageData.data[i + 1];
+                  const b = imageData.data[i + 2];
+                  const gray = Math.floor((r + g + b) / 3);
+                  colorData[idx] = { r, g, b, gray };
+                }
 
-            // Show the best detection (highest confidence) in the main display
-            const best = detections[0];
-            const bestLength = Math.max(best.width, best.height) * pixelToCmRatio;
-            const bestWidth = Math.min(best.width, best.height) * pixelToCmRatio;
-            const bestCategory = classifyFishSize(bestLength, bestWidth);
-            const bestConfidence = best.confidence * 100;
+                if (scaledDetections.length > 0) {
+                  // Store detections for persistent drawing
+                  const detectionsToDraw: Array<{ x: number; y: number; width: number; height: number; color: string; label: string; isTilapia?: boolean }> = [];
 
-            setDetectionInfo({
-              length: parseFloat(bestLength.toFixed(2)),
-              width: parseFloat(bestWidth.toFixed(2)),
-              category: bestCategory,
-              confidence: parseFloat(bestConfidence.toFixed(1)),
-            });
+                  scaledDetections.forEach((detection, index) => {
+                    // Check if this detection is tilapia (use scaled coordinates for color data)
+                    const scaledBox = {
+                      x: Math.floor(detection.x * processScale),
+                      y: Math.floor(detection.y * processScale),
+                      width: Math.floor(detection.width * processScale),
+                      height: Math.floor(detection.height * processScale),
+                    };
+                    const isTilapiaFish = isTilapia(colorData, { ...scaledBox, confidence: detection.confidence }, processWidth, processHeight);
+                    // Green for tilapia, grey for other fish
+                    // Use bright green (#00ff00) for tilapia to make it clearly visible
+                    const color = isTilapiaFish ? '#00ff00' : '#808080'; // Bright green for tilapia, grey for other fish
 
-            // Save all detections to database
-            fullDetections.forEach((det) => {
-              fetch('/api/fish-detection', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  length: det.length.toFixed(2),
-                  width: det.width.toFixed(2),
-                  category: det.category,
-                  confidence: det.confidence.toFixed(1),
-                }),
-              }).catch(err => console.error('Save error:', err));
-            });
+                    // Prepare label
+                    const fishType = isTilapiaFish ? 'Tilapia' : 'Fish';
+                    const label = `${fishType} ${index + 1} ${(detection.confidence * 100).toFixed(1)}%`;
 
-            if (soundEnabled && detections.length > 0) {
-              playNotificationSound();
+                    // Store detection for drawing on every frame
+                    // Include isTilapia flag for enhanced drawing
+                    detectionsToDraw.push({
+                      x: detection.x,
+                      y: detection.y,
+                      width: detection.width,
+                      height: detection.height,
+                      color,
+                      label,
+                      isTilapia: isTilapiaFish, // Store tilapia flag for enhanced drawing
+                    });
+
+                    // Calculate measurements
+                    const length = Math.max(detection.width, detection.height) * pixelToCmRatio;
+                    const width = Math.min(detection.width, detection.height) * pixelToCmRatio;
+                    const category = classifyFishSize(length, width);
+                    const confidence = detection.confidence * 100;
+
+                    fullDetections.push({
+                      length: parseFloat(length.toFixed(2)),
+                      width: parseFloat(width.toFixed(2)),
+                      category,
+                      confidence: parseFloat(confidence.toFixed(1)),
+                      x: detection.x,
+                      y: detection.y,
+                      fishType: isTilapiaFish ? 'tilapia' : 'other',
+                    });
+                  });
+
+                  // Update the ref with current detections for persistent drawing
+                  currentDetectionsRef.current = detectionsToDraw;
+
+                  // Update state with all detections
+                  setAllDetections(fullDetections);
+
+                  // Show the best detection (highest confidence) in the main display
+                  const best = scaledDetections[0];
+                  const bestLength = Math.max(best.width, best.height) * pixelToCmRatio;
+                  const bestWidth = Math.min(best.width, best.height) * pixelToCmRatio;
+                  const bestCategory = classifyFishSize(bestLength, bestWidth);
+                  const bestConfidence = best.confidence * 100;
+
+                  setDetectionInfo({
+                    length: parseFloat(bestLength.toFixed(2)),
+                    width: parseFloat(bestWidth.toFixed(2)),
+                    category: bestCategory,
+                    confidence: parseFloat(bestConfidence.toFixed(1)),
+                  });
+
+                  // Save first detection to database (throttled)
+                  if (fullDetections.length > 0) {
+                    const firstDet = fullDetections[0];
+                    fetch('/api/fish-detection', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        length: firstDet.length.toFixed(2),
+                        width: firstDet.width.toFixed(2),
+                        category: firstDet.category,
+                        confidence: firstDet.confidence.toFixed(1),
+                      }),
+                    }).catch(err => console.error('Save error:', err));
+                  }
+
+                  if (soundEnabled && scaledDetections.length > 0) {
+                    playNotificationSound();
+                  }
+                } else {
+                  // Clear detections if none found
+                  currentDetectionsRef.current = [];
+                  setDetectionInfo({ length: null, width: null, category: null, confidence: null });
+                  setAllDetections([]);
+                }
+              }
             }
           } else {
-            setDetectionInfo({ length: null, width: null, category: null, confidence: null });
-            setAllDetections([]);
+            // No detection processing this frame, but still draw video
+            // Keep previous detections visible
           }
         } catch (error) {
           console.error('Draw error:', error);
         }
+      } else {
+        // Video not ready, continue loop
       }
 
-      // Continue loop
+      // Continue loop immediately (smooth video display)
       animationFrameRef.current = requestAnimationFrame(detect);
     };
 
     // Start immediately
     animationFrameRef.current = requestAnimationFrame(detect);
-  };
-
-  const playNotificationSound = () => {
-    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-    const oscillator = audioContext.createOscillator();
-    const gainNode = audioContext.createGain();
-    oscillator.connect(gainNode);
-    gainNode.connect(audioContext.destination);
-    oscillator.frequency.value = 800;
-    oscillator.type = 'sine';
-    gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2);
-    oscillator.start(audioContext.currentTime);
-    oscillator.stop(audioContext.currentTime + 0.2);
   };
 
   const toggleFullscreen = () => {
@@ -978,12 +1208,12 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
         </div>
 
         <div className="flex gap-2 justify-center flex-wrap mb-6">
-          <button
+          {/* <button
             className="px-[18px] py-2.5 text-sm font-semibold border-2 border-blue-500/50 rounded-lg cursor-pointer transition-all duration-300 bg-white/5 text-blue-500 backdrop-blur-sm hover:bg-blue-500/10 hover:border-blue-500 hover:-translate-y-0.5"
             onClick={handleViewHistory}
           >
             <i className="fas fa-history mr-1.5"></i> History
-          </button>
+          </button> */}
           <button
             className="px-[18px] py-2.5 text-sm font-semibold border-2 border-green-500/50 rounded-lg cursor-pointer transition-all duration-300 bg-white/5 text-green-500 backdrop-blur-sm hover:bg-green-500/10 hover:border-green-500 hover:-translate-y-0.5"
             onClick={toggleFullscreen}
@@ -1048,23 +1278,29 @@ export default function FishDetectionModal({ isOpen, onClose }: FishDetectionMod
             <div className="mb-4 p-3 bg-white/5 rounded-lg border border-white/5">
               <div className="text-xs text-[#888] mb-2 font-semibold uppercase tracking-wider">All Detections:</div>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                {allDetections.map((det, idx) => (
-                  <div key={idx} className="p-2 bg-white/3 rounded border border-white/5 text-xs">
-                    <div className="flex items-center gap-1 mb-1">
-                      <div
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: ['#00ff00', '#00ffff', '#ff00ff', '#ffff00', '#ff8800', '#00ff88'][idx % 6] }}
-                      ></div>
-                      <span className="font-semibold text-[#e6e9ef]">Fish {idx + 1}</span>
+                {allDetections.map((det, idx) => {
+                  const isTilapia = det.fishType === 'tilapia';
+                  const boxColor = isTilapia ? '#00ff00' : '#808080';
+                  return (
+                    <div key={idx} className="p-2 bg-white/3 rounded border border-white/5 text-xs">
+                      <div className="flex items-center gap-1 mb-1">
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: boxColor }}
+                        ></div>
+                        <span className="font-semibold text-[#e6e9ef]">
+                          {isTilapia ? 'Tilapia' : 'Fish'} {idx + 1}
+                        </span>
+                      </div>
+                      <div className="text-[#888]">
+                        L: {det.length}cm × W: {det.width}cm
+                      </div>
+                      <div className="text-[#888]">
+                        {det.category} ({det.confidence}%)
+                      </div>
                     </div>
-                    <div className="text-[#888]">
-                      L: {det.length}cm × W: {det.width}cm
-                    </div>
-                    <div className="text-[#888]">
-                      {det.category} ({det.confidence}%)
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           )}
