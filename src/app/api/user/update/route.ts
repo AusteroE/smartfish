@@ -24,6 +24,21 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        // Validate field lengths
+        if (username.length > 50) {
+            return NextResponse.json(
+                { success: false, error: 'Username must be 50 characters or less' },
+                { status: 400 }
+            );
+        }
+
+        if (email.length > 100) {
+            return NextResponse.json(
+                { success: false, error: 'Email must be 100 characters or less' },
+                { status: 400 }
+            );
+        }
+
         // Validate email format
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
@@ -64,9 +79,19 @@ export async function POST(request: NextRequest) {
 
         // Validate phone number format if provided
         if (phoneNumber && phoneNumber.trim()) {
+            const trimmedPhone = phoneNumber.trim();
+
+            // Validate length
+            if (trimmedPhone.length > 20) {
+                return NextResponse.json(
+                    { success: false, error: 'Phone number must be 20 characters or less' },
+                    { status: 400 }
+                );
+            }
+
             // Basic validation: should start with + and contain only digits after +
             const phoneRegex = /^\+[1-9]\d{1,14}$/;
-            if (!phoneRegex.test(phoneNumber.trim())) {
+            if (!phoneRegex.test(trimmedPhone)) {
                 return NextResponse.json(
                     { success: false, error: 'Invalid phone number format. Use international format (e.g., +639123456789)' },
                     { status: 400 }
@@ -76,8 +101,8 @@ export async function POST(request: NextRequest) {
 
         // Update user
         const updateData: any = {
-            username,
-            email,
+            username: username.trim(),
+            email: email.trim(),
         };
 
         if (phoneNumber !== null) {

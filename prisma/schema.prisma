@@ -15,7 +15,7 @@ model User {
   username            String    @db.VarChar(50)
   email               String    @unique @db.VarChar(100)
   password            String    @db.VarChar(255)
-  profileImage        String    @default("frontend/img/default profile.png") @map("profile_image") @db.VarChar(255)
+  profileImage        String    @default("frontend/img/default profile.png") @map("profile_image") @db.Text
   phoneNumber         String?   @map("phone_number") @db.VarChar(20)
   role                UserRole  @default(user)
   emailVerified       Boolean   @default(false) @map("email_verified")
