@@ -87,13 +87,62 @@ export default function SettingsPage() {
         }
     };
 
+    // Helper function to format Philippine phone numbers with +63 prefix
+    const formatPhoneNumber = (value: string): string => {
+        // Remove all non-digit characters except +
+        let cleaned = value.replace(/[^\d+]/g, '');
+
+        // If it starts with +, keep it
+        if (cleaned.startsWith('+')) {
+            // If it's already +63, return as is
+            if (cleaned.startsWith('+63')) {
+                return cleaned;
+            }
+            // If it starts with + but not +63, return as is (might be other country)
+            return cleaned;
+        }
+
+        // If it starts with 0, remove it and add +63
+        if (cleaned.startsWith('0')) {
+            return '+63' + cleaned.substring(1);
+        }
+
+        // If it starts with 63, add +
+        if (cleaned.startsWith('63')) {
+            return '+' + cleaned;
+        }
+
+        // If it starts with 9 (Philippine mobile number pattern), add +63
+        if (cleaned.startsWith('9') && cleaned.length >= 10) {
+            return '+63' + cleaned;
+        }
+
+        // If it's just digits and looks like a Philippine number (10 digits starting with 9)
+        if (/^9\d{9}$/.test(cleaned)) {
+            return '+63' + cleaned;
+        }
+
+        // Otherwise, if it doesn't start with +, add +63 prefix
+        if (cleaned.length > 0 && !cleaned.startsWith('+')) {
+            // If it's a valid Philippine mobile number format (10 digits starting with 9)
+            if (/^9\d{9}$/.test(cleaned)) {
+                return '+63' + cleaned;
+            }
+        }
+
+        return cleaned;
+    };
+
     const handleSendOtp = async () => {
-        const phoneToVerify = newPhoneNumber.trim();
+        let phoneToVerify = newPhoneNumber.trim();
 
         if (!phoneToVerify) {
             setError('Please enter a phone number');
             return;
         }
+
+        // Auto-format Philippine phone numbers with +63 prefix
+        phoneToVerify = formatPhoneNumber(phoneToVerify);
 
         // Validate phone number format
         const phoneRegex = /^\+[1-9]\d{1,14}$/;
@@ -101,6 +150,9 @@ export default function SettingsPage() {
             setError('Invalid phone number format. Use international format (e.g., +639123456789)');
             return;
         }
+
+        // Update the state with formatted number
+        setNewPhoneNumber(phoneToVerify);
 
         // Check if phone number is the same as existing (no need to verify if unchanged)
         if (phoneToVerify === phoneNumber && phoneNumber) {
@@ -126,7 +178,12 @@ export default function SettingsPage() {
                 setSuccess('OTP sent successfully to your phone number!');
                 setOtpSent(true);
             } else {
-                setError(data.error || 'Failed to send OTP');
+                // Check if it's the SMS service configuration error
+                if (data.error && data.error.includes('SMS service not configured')) {
+                    setError('SMS service is not configured. Please contact the administrator to set up SEMAPHORE_API_KEY in Vercel environment variables.');
+                } else {
+                    setError(data.error || 'Failed to send OTP');
+                }
             }
         } catch (err) {
             console.error('Send OTP error:', err);
@@ -367,8 +424,8 @@ export default function SettingsPage() {
 
             {/* Profile Section */}
             <div className={`mb-6 rounded-xl border transition-all duration-300 ${editing
-                    ? 'border-[#7c5cff]/40 bg-gradient-to-b from-[#7c5cff]/10 to-white/4 shadow-[0_0_20px_rgba(124,92,255,0.15)]'
-                    : 'border-white/12 bg-gradient-to-b from-white/6 to-white/2'
+                ? 'border-[#7c5cff]/40 bg-gradient-to-b from-[#7c5cff]/10 to-white/4 shadow-[0_0_20px_rgba(124,92,255,0.15)]'
+                : 'border-white/12 bg-gradient-to-b from-white/6 to-white/2'
                 } p-5 sm:p-6`}>
                 <div className="flex items-center justify-between mb-6">
                     <label className="font-semibold text-lg text-[#e6e9ef] flex items-center gap-2">
@@ -380,8 +437,8 @@ export default function SettingsPage() {
                 <div className="flex flex-col sm:flex-row items-start gap-5 sm:gap-5">
                     <div className="relative flex-shrink-0 self-center sm:self-start">
                         <div className={`relative w-[100px] h-[100px] sm:w-[110px] sm:h-[110px] rounded-full overflow-hidden border-2 transition-all duration-300 ${editing
-                                ? 'border-[#7c5cff]/50 shadow-[0_0_15px_rgba(124,92,255,0.3)]'
-                                : 'border-white/20'
+                            ? 'border-[#7c5cff]/50 shadow-[0_0_15px_rgba(124,92,255,0.3)]'
+                            : 'border-white/20'
                             }`}>
                             <Image
                                 src={getProfileImageSrc()}
@@ -473,8 +530,8 @@ export default function SettingsPage() {
                                                 }
                                             }}
                                             className={`w-full px-4 py-3 bg-white/5 border rounded-lg text-sm text-[#e6e9ef] focus:outline-none focus:ring-2 transition-all placeholder:text-[#666] hover:border-white/20 ${username === email && username.includes('@')
-                                                    ? 'border-yellow-500/40 focus:border-yellow-500 focus:ring-yellow-500/20'
-                                                    : 'border-white/15 focus:border-[#7c5cff] focus:ring-[#7c5cff]/20'
+                                                ? 'border-yellow-500/40 focus:border-yellow-500 focus:ring-yellow-500/20'
+                                                : 'border-white/15 focus:border-[#7c5cff] focus:ring-[#7c5cff]/20'
                                                 }`}
                                             placeholder={username === email ? "Enter a unique username" : "Enter username (not email)"}
                                         />
@@ -520,14 +577,31 @@ export default function SettingsPage() {
                                                         type="tel"
                                                         value={newPhoneNumber}
                                                         onChange={(e) => {
-                                                            const value = e.target.value;
+                                                            let value = e.target.value;
+
+                                                            // Auto-format Philippine phone numbers as user types
+                                                            // Only auto-format if it doesn't already start with + (international format)
+                                                            if (value && !value.startsWith('+')) {
+                                                                // If user is typing a Philippine number (starts with 0 or 9)
+                                                                if (value.startsWith('0') || (value.match(/^\d+$/) && value.length <= 11 && value.startsWith('9'))) {
+                                                                    // Remove leading 0 if present
+                                                                    if (value.startsWith('0')) {
+                                                                        value = '+63' + value.substring(1);
+                                                                    } else if (value.startsWith('9')) {
+                                                                        value = '+63' + value;
+                                                                    } else if (value.startsWith('63')) {
+                                                                        value = '+' + value;
+                                                                    }
+                                                                }
+                                                            }
+
                                                             setNewPhoneNumber(value);
                                                             // Real-time validation feedback
                                                             if (value && value.trim()) {
                                                                 const phoneRegex = /^\+[1-9]\d{1,14}$/;
                                                                 if (!phoneRegex.test(value.trim())) {
-                                                                    // Show inline error
-                                                                    if (value.length > 1) {
+                                                                    // Show inline error only if user has typed more than a few characters
+                                                                    if (value.length > 3) {
                                                                         setError('Invalid format. Use international format (e.g., +639123456789)');
                                                                     }
                                                                 } else {
@@ -537,8 +611,18 @@ export default function SettingsPage() {
                                                                 setError('');
                                                             }
                                                         }}
+                                                        onBlur={(e) => {
+                                                            // Auto-format when user leaves the field
+                                                            const value = e.target.value.trim();
+                                                            if (value) {
+                                                                const formatted = formatPhoneNumber(value);
+                                                                if (formatted !== value) {
+                                                                    setNewPhoneNumber(formatted);
+                                                                }
+                                                            }
+                                                        }}
                                                         className="flex-1 px-4 py-3 bg-white/5 border border-white/15 rounded-lg text-sm text-[#e6e9ef] focus:outline-none focus:border-[#7c5cff] focus:ring-2 focus:ring-[#7c5cff]/20 transition-all placeholder:text-[#666] hover:border-white/20"
-                                                        placeholder={phoneNumber && phoneNumber !== '+1234567890' ? phoneNumber : "+639123456789"}
+                                                        placeholder={phoneNumber && phoneNumber !== '+1234567890' ? phoneNumber : "+639123456789 (or type 09123456789)"}
                                                         disabled={sendingOtp}
                                                     />
                                                     <button
@@ -563,7 +647,7 @@ export default function SettingsPage() {
                                                 </div>
                                                 <p className="text-[10px] text-[#888] mt-1.5 flex items-center gap-1.5">
                                                     <i className="fas fa-info-circle text-[#7c5cff]"></i>
-                                                    <span>Use international format (e.g., +639123456789). Verification required.</span>
+                                                    <span>Use international format (e.g., +639123456789) or type Philippine number (09123456789). +63 prefix will be added automatically.</span>
                                                 </p>
                                             </div>
                                         </>
